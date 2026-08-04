@@ -3,7 +3,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![Validate](https://github.com/derekclapham/ha-mempool/actions/workflows/validate.yaml/badge.svg)](https://github.com/derekclapham/ha-mempool/actions/workflows/validate.yaml)
 
-A Home Assistant integration for [mempool](https://github.com/mempool/mempool) — the Bitcoin blockchain and mempool explorer. Point it at the **public mempool.space** or **your own self-hosted instance** and get native Bitcoin sensors: price, latest block, on-chain status, fees, mempool state, mining, network pace and more (~35 sensors).
+A Home Assistant integration for [mempool](https://github.com/mempool/mempool) — the Bitcoin blockchain and mempool explorer. Point it at the **public mempool.space** or **your own self-hosted instance** and get native Bitcoin sensors: price, latest block, on-chain status, fees, mempool state, mining, network pace and more (36 sensors).
 
 Unlike Home Assistant's core `bitcoin`/`blockchain` integrations (which rely on third-party services), this talks to a real mempool instance — including your own node for a fully local setup — and can **backfill years of price history** into long-term statistics in one call.
 
@@ -11,7 +11,7 @@ Unlike Home Assistant's core `bitcoin`/`blockchain` integrations (which rely on 
 
 - 🟠 **Public or self-hosted** — choose **mempool.space** in one step, or enter your own instance's URL.
 - 🖥️ **UI config flow** — no YAML.
-- 🧱 **Rich Bitcoin data** — price, latest block (miner, size, weight, reward, fees, median fee), difficulty and adjustment, fee tiers, mempool projection, halving countdown, top mining pool, network pace, and 24-hour mining reward stats.
+- 🧱 **Rich Bitcoin data** — price, latest block (miner, size, weight, reward, fees, median fee), difficulty and adjustment, fee tiers, mempool projection, halving countdown (blocks + estimated date), top mining pool, network pace, and 24-hour mining reward stats.
 - 💰 **Price in your currency** — pick from the fiats your instance serves; optionally expose the rest as attributes for templating.
 - 📈 **Instant price history** — the `mempool.import_price_history` service backfills long-term statistics from the `historical-price` feed.
 - ⚙️ **Respectful polling** — three internal coordinators by cadence; self-hosted users tune the fast interval, while the public instance is locked to a gentle 5-minute poll.
@@ -52,6 +52,7 @@ Each config entry creates one device with the sensors below. All numeric sensors
 | Projected blocks | `8` | How many blocks the current mempool would fill |
 | Next block fee | `1 sat/vB` | Median fee of the next projected block |
 | Blocks to halving | `89,032` | Countdown to the next subsidy halving |
+| Next halving | timestamp | Estimated date of the next halving — renders as a countdown, and templates can derive the exact time remaining |
 | Block subsidy | `3.125 BTC` | Current per-block subsidy |
 | Blocks per hour | `7` | Blocks mined in the last rolling 60 min (target is 6) |
 | Network pace | `117 %` | Block rate vs the 10-min target — 100% = on schedule |
@@ -65,6 +66,8 @@ Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode
 ## Installation
 
 ### HACS (recommended)
+
+Once it's in the HACS default store you'll be able to search **Bitcoin Mempool** directly. Until then, add it as a custom repository:
 
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/derekclapham/ha-mempool`, category **Integration**.
 2. Install **Bitcoin Mempool** and restart Home Assistant.
@@ -154,7 +157,7 @@ series:
 
 ## Roadmap
 
-- Listing in the **HACS default store** (requires a [home-assistant/brands](https://github.com/home-assistant/brands) PR — in progress).
+- Listing in the **HACS default store**, so it installs without adding a custom repository (in progress).
 - HTTP basic auth for protected instances.
 - Automated tests and a diagnostics download.
 
