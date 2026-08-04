@@ -63,7 +63,10 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
         raise ServiceValidationError("The mempool entry is not loaded.")
 
     entry = _typed(entry)
-    currency: str | None = entry.data.get(CONF_CURRENCY)
+    # Options win over the setup-time data (the currency can be changed later).
+    currency: str | None = entry.options.get(
+        CONF_CURRENCY, entry.data.get(CONF_CURRENCY)
+    )
     if not currency:
         raise ServiceValidationError("This entry has no price currency configured.")
 

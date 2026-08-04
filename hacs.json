@@ -1,4 +1,4 @@
 {
-  "name": "Mempool (self-hosted Bitcoin node)",
+  "name": "Bitcoin Mempool",
   "homeassistant": "2025.1.0"
 }

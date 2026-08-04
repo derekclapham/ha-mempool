@@ -12,6 +12,7 @@ from .const import (
     CONF_BASE_URL,
     CONF_CURRENCY,
     CONF_FAST_INTERVAL,
+    CONF_PRICE_ATTRIBUTES,
     CONF_VERIFY_SSL,
     DEFAULT_FAST_INTERVAL,
     DEFAULT_VERIFY_SSL,
@@ -42,6 +43,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: MempoolConfigEntry) -> b
     )
     currency: str | None = entry.options.get(
         CONF_CURRENCY, entry.data.get(CONF_CURRENCY)
+    )
+    price_attributes: bool = entry.options.get(
+        CONF_PRICE_ATTRIBUTES, entry.data.get(CONF_PRICE_ATTRIBUTES, False)
     )
     fast_interval = timedelta(
         seconds=entry.options.get(
@@ -83,7 +87,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: MempoolConfigEntry) -> b
     if price is not None:
         await price.async_config_entry_first_refresh()
 
-    entry.runtime_data = MempoolData(client, currency, fast, slow, price)
+    entry.runtime_data = MempoolData(
+        client, currency, price_attributes, fast, slow, price
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Reload (rebuilding coordinators with the new interval) when options change.

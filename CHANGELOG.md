@@ -2,6 +2,24 @@
 
 All notable changes to Machete are documented here.
 
+## [0.2.0] - 2026-08-04
+
+### Features
+- Add support for choosing between mempool.space or self-hosted mempool instance during setup
+- Add 24-hour mining reward statistics with optional multi-currency attributes
+- Add latest block weight sensor
+- Add network-pace sensors tracking blocks per hour and percentage of schedule
+- Add latest-block, mempool-projection, halving, and mining-pool sensors
+
+### Fixes
+- Fix import_price_history to respect the configured currency option
+
+### Improvements
+- Refresh README with updated documentation and branding
+
+### Documentation
+- Rename project to "Bitcoin Mempool" throughout documentation
+
 ## [0.1.0] - 2026-08-04
 
 # Features

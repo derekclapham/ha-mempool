@@ -19,10 +19,16 @@ CONF_BASE_URL = "base_url"
 CONF_CURRENCY = "currency"
 CONF_FAST_INTERVAL = "fast_interval"
 CONF_VERIFY_SSL = "verify_ssl"
+CONF_PRICE_ATTRIBUTES = "price_attributes"  # opt-in: other fiats as attributes
 
 DEFAULT_NAME = "Mempool"
 DEFAULT_FAST_INTERVAL = 60  # seconds — chain tip/fees/mempool don't change faster
 DEFAULT_VERIFY_SSL = True  # off lets an instance behind self-signed HTTPS work
+
+# The public instance: a fixed URL and a gentle, locked poll interval so we
+# don't hammer their shared API. Self-hosted users pick their own URL/interval.
+MEMPOOL_SPACE_URL = "https://mempool.space"
+PUBLIC_FAST_INTERVAL = 300  # seconds — locked for the public instance
 
 # Fixed poll intervals for the two groups that don't warrant user tuning.
 # Price moves slowly enough that 5 min is plenty; difficulty/hashrate barely
@@ -40,6 +46,10 @@ SLOW_INTERVAL = timedelta(seconds=600)
 #   hashrate          -> {currentHashrate (H/s), currentDifficulty, ...}
 #   prices            -> {time, USD, EUR, ... , AUD}  (fiats vary per instance)
 #   historical-price  -> {prices: [{time, <CUR>, ...}, ...]}  (optional feed)
+#   blocks            -> [{height, timestamp, tx_count, size, weight, extras:{
+#                         reward, totalFees, medianFee, pool:{name}}}, ...]
+#   mempool-blocks    -> [{nTx, medianFee, ...}, ...]  (projected next blocks)
+#   mining/pools/1w   -> {pools: [{name, blockCount, rank}, ...]}
 API_TIP_HEIGHT = "/api/blocks/tip/height"
 API_DIFFICULTY = "/api/v1/difficulty-adjustment"
 API_FEES = "/api/v1/fees/recommended"
@@ -47,6 +57,15 @@ API_MEMPOOL = "/api/mempool"
 API_HASHRATE = "/api/v1/mining/hashrate/3d"
 API_PRICES = "/api/v1/prices"
 API_HISTORICAL_PRICE = "/api/v1/historical-price"
+API_BLOCKS = "/api/v1/blocks"
+API_MEMPOOL_BLOCKS = "/api/v1/fees/mempool-blocks"
+API_MINING_POOLS = "/api/v1/mining/pools/1w"
+# reward-stats over the last 144 blocks (~24h): {totalReward, totalFee, totalTx}
+API_REWARD_STATS = "/api/v1/mining/reward-stats/144"
+
+# Bitcoin constants for computed sensors.
+HALVING_INTERVAL = 210_000  # blocks between subsidy halvings
+INITIAL_SUBSIDY = 50  # BTC block subsidy before the first halving
 
 # Service to backfill price history into long-term statistics (see services.py).
 SERVICE_IMPORT_PRICE_HISTORY = "import_price_history"

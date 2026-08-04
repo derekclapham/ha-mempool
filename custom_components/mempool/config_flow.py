@@ -31,11 +31,14 @@ from .const import (
     CONF_BASE_URL,
     CONF_CURRENCY,
     CONF_FAST_INTERVAL,
+    CONF_PRICE_ATTRIBUTES,
     CONF_VERIFY_SSL,
     DEFAULT_FAST_INTERVAL,
     DEFAULT_NAME,
     DEFAULT_VERIFY_SSL,
     DOMAIN,
+    MEMPOOL_SPACE_URL,
+    PUBLIC_FAST_INTERVAL,
 )
 
 
@@ -97,7 +100,29 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Collect the instance URL and validate connectivity."""
+        """Choose the public instance or a self-hosted one."""
+        return self.async_show_menu(
+            step_id="user", menu_options=["mempool_space", "self_hosted"]
+        )
+
+    async def async_step_mempool_space(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Set up against the public mempool.space instance (fixed settings)."""
+        await self.async_set_unique_id(MEMPOOL_SPACE_URL)
+        self._abort_if_unique_id_configured()
+        client = _make_client(self.hass, MEMPOOL_SPACE_URL, True)
+        if not await self._validate(client):
+            return self.async_abort(reason="cannot_connect")
+        # Public instance: SSL verified, poll interval locked (be gentle).
+        return await self._finish_setup(
+            MEMPOOL_SPACE_URL, True, PUBLIC_FAST_INTERVAL, client
+        )
+
+    async def async_step_self_hosted(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Collect a self-hosted instance URL and validate connectivity."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -109,26 +134,12 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             client = _make_client(self.hass, base_url, verify_ssl)
-            try:
-                # difficulty-adjustment proves we're really talking to a
-                # mempool API at the right path prefix (not just a proxy that
-                # happens to answer). Its response is a rich object we can check.
-                diff = await client.difficulty_adjustment()
-                if "progressPercent" not in diff:
-                    raise MempoolApiError("unexpected response shape")
-            except MempoolApiError:
+            if not await self._validate(client):
                 errors["base"] = "cannot_connect"
             else:
-                self._data = {
-                    CONF_BASE_URL: base_url,
-                    CONF_VERIFY_SSL: verify_ssl,
-                    CONF_FAST_INTERVAL: int(user_input[CONF_FAST_INTERVAL]),
-                }
-                # With a price feed, ask which currency; otherwise finish now.
-                self._currencies = await _probe_currencies(client)
-                if self._currencies:
-                    return await self.async_step_currency()
-                return self._create()
+                return await self._finish_setup(
+                    base_url, verify_ssl, int(user_input[CONF_FAST_INTERVAL]), client
+                )
 
         schema = vol.Schema(
             {
@@ -144,8 +155,38 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
+            step_id="self_hosted", data_schema=schema, errors=errors
         )
+
+    async def _validate(self, client: MempoolClient) -> bool:
+        """True if the URL answers as a real mempool API.
+
+        difficulty-adjustment returns a rich object we can check, proving it's
+        a mempool API at the right path prefix (not just a proxy that answers).
+        """
+        try:
+            diff = await client.difficulty_adjustment()
+        except MempoolApiError:
+            return False
+        return "progressPercent" in diff
+
+    async def _finish_setup(
+        self,
+        base_url: str,
+        verify_ssl: bool,
+        fast_interval: int,
+        client: MempoolClient,
+    ) -> ConfigFlowResult:
+        """Store settings, then branch to the currency step if a feed exists."""
+        self._data = {
+            CONF_BASE_URL: base_url,
+            CONF_VERIFY_SSL: verify_ssl,
+            CONF_FAST_INTERVAL: fast_interval,
+        }
+        self._currencies = await _probe_currencies(client)
+        if self._currencies:
+            return await self.async_step_currency()
+        return self._create()
 
     async def async_step_currency(
         self, user_input: dict[str, Any] | None = None
@@ -153,6 +194,7 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick which fiat the price sensor reports."""
         if user_input is not None:
             self._data[CONF_CURRENCY] = user_input[CONF_CURRENCY]
+            self._data[CONF_PRICE_ATTRIBUTES] = user_input[CONF_PRICE_ATTRIBUTES]
             return self._create()
 
         default = _currency_default(self.hass, self._currencies, None)
@@ -162,7 +204,10 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
                     SelectSelectorConfig(
                         options=self._currencies, mode=SelectSelectorMode.DROPDOWN
                     )
-                )
+                ),
+                # Opt-in: also expose every other fiat as a price-sensor
+                # attribute (handy for templates; not recorded as statistics).
+                vol.Required(CONF_PRICE_ATTRIBUTES, default=False): BooleanSelector(),
             }
         )
         return self.async_show_form(step_id="currency", data_schema=schema)
@@ -205,6 +250,9 @@ class MempoolOptionsFlow(OptionsFlow):
         current_currency = entry.options.get(
             CONF_CURRENCY, entry.data.get(CONF_CURRENCY)
         )
+        current_attributes = entry.options.get(
+            CONF_PRICE_ATTRIBUTES, entry.data.get(CONF_PRICE_ATTRIBUTES, False)
+        )
 
         if user_input is not None:
             return self.async_create_entry(data=user_input)
@@ -214,12 +262,16 @@ class MempoolOptionsFlow(OptionsFlow):
         client = _make_client(self.hass, entry.data[CONF_BASE_URL], current_verify)
         currencies = await _probe_currencies(client)
 
-        schema: dict[Any, Any] = {
-            vol.Required(
-                CONF_FAST_INTERVAL, default=current_interval
-            ): _fast_interval_selector(),
-            vol.Required(CONF_VERIFY_SSL, default=current_verify): BooleanSelector(),
-        }
+        # The public instance keeps a fixed interval and SSL — don't offer them.
+        is_public = entry.data.get(CONF_BASE_URL) == MEMPOOL_SPACE_URL
+        schema: dict[Any, Any] = {}
+        if not is_public:
+            schema[vol.Required(CONF_FAST_INTERVAL, default=current_interval)] = (
+                _fast_interval_selector()
+            )
+            schema[vol.Required(CONF_VERIFY_SSL, default=current_verify)] = (
+                BooleanSelector()
+            )
         # Only offer a currency picker when the instance actually has a feed.
         if currencies:
             schema[
@@ -232,5 +284,8 @@ class MempoolOptionsFlow(OptionsFlow):
                     options=currencies, mode=SelectSelectorMode.DROPDOWN
                 )
             )
+            schema[
+                vol.Required(CONF_PRICE_ATTRIBUTES, default=current_attributes)
+            ] = BooleanSelector()
 
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))

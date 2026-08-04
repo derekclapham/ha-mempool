@@ -2,8 +2,16 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to your mempool instance",
-        "description": "Enter the base URL of your mempool web server — your own self-hosted node, or a public instance.",
+        "title": "Add a mempool instance",
+        "description": "Use the public mempool.space, or connect to your own self-hosted instance.",
+        "menu_options": {
+          "mempool_space": "mempool.space (public)",
+          "self_hosted": "Self-hosted instance"
+        }
+      },
+      "self_hosted": {
+        "title": "Self-hosted instance",
+        "description": "Enter the base URL of your mempool web server.",
         "data": {
           "base_url": "Base URL",
           "verify_ssl": "Verify SSL certificate",
@@ -12,14 +20,18 @@
         "data_description": {
           "base_url": "Include the scheme, host and port. If it is behind a reverse proxy, enter the proxy's address.",
           "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
-          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool). Poll public instances gently."
+          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool)."
         }
       },
       "currency": {
         "title": "Price currency",
         "description": "Your instance publishes a price feed. Pick which fiat the price sensor should report.",
         "data": {
-          "currency": "Currency"
+          "currency": "Currency",
+          "price_attributes": "Expose other currencies as attributes"
+        },
+        "data_description": {
+          "price_attributes": "Optionally attach every other fiat your instance serves to the price sensor as attributes, for templating. These are not recorded as long-term statistics."
         }
       }
     },
@@ -27,7 +39,8 @@
       "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API."
     },
     "abort": {
-      "already_configured": "This mempool instance is already configured."
+      "already_configured": "This mempool instance is already configured.",
+      "cannot_connect": "Could not reach mempool.space right now. Please try again."
     }
   },
   "options": {
@@ -37,12 +50,14 @@
         "data": {
           "fast_interval": "Fast poll interval (seconds)",
           "verify_ssl": "Verify SSL certificate",
-          "currency": "Price currency"
+          "currency": "Price currency",
+          "price_attributes": "Expose other currencies as attributes"
         },
         "data_description": {
           "fast_interval": "How often to poll chain tip, fees and mempool.",
           "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
-          "currency": "Changing this starts a new price-history series; the previous currency's sensor keeps its history but stops updating. Re-run the Import price history action afterwards."
+          "currency": "Changing this starts a new price-history series; the previous currency's sensor keeps its history but stops updating. Re-run the Import price history action afterwards.",
+          "price_attributes": "Attach every other fiat your instance serves to the price sensor as attributes (for templating; not recorded as statistics)."
         }
       }
     }
@@ -64,6 +79,25 @@
       "next_retarget": { "name": "Next difficulty retarget" },
       "hashrate": { "name": "Network hashrate" },
       "difficulty": { "name": "Network difficulty" },
+      "latest_block_time": { "name": "Latest block" },
+      "latest_block_transactions": { "name": "Latest block transactions" },
+      "latest_block_size": { "name": "Latest block size" },
+      "latest_block_weight": { "name": "Latest block weight" },
+      "latest_block_miner": { "name": "Latest block miner" },
+      "latest_block_reward": { "name": "Latest block reward" },
+      "latest_block_fees": { "name": "Latest block fees" },
+      "latest_block_median_fee": { "name": "Latest block median fee" },
+      "projected_blocks": { "name": "Projected blocks" },
+      "next_block_fee": { "name": "Next block fee" },
+      "blocks_to_halving": { "name": "Blocks to halving" },
+      "block_subsidy": { "name": "Block subsidy" },
+      "blocks_per_hour": { "name": "Blocks per hour" },
+      "network_pace": { "name": "Network pace" },
+      "top_pool": { "name": "Top mining pool" },
+      "top_pool_share": { "name": "Top pool share" },
+      "mining_reward_24h": { "name": "Mining reward (24h)" },
+      "mining_fees_24h": { "name": "Mining fees (24h)" },
+      "mean_tx_fee_24h": { "name": "Mean transaction fee (24h)" },
       "price": { "name": "BTC price" }
     }
   },
