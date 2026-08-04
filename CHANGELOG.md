@@ -2,6 +2,19 @@
 
 All notable changes to Machete are documented here.
 
+## [0.3.0] - 2026-08-04
+
+### Features
+- Add estimated next-halving timestamp sensor to track Bitcoin halving events
+- Ship brand icons and logos with the integration for improved visual identification
+
+### Improvements
+- Automate manifest version syncing from release branch to reduce manual maintenance
+- Enhance release process with automatic versioning via zip_release
+
+### Internal
+- Stop tracking local icon source files to reduce repository size
+
 ## [0.2.0] - 2026-08-04
 
 ### Features
