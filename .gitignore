@@ -7,3 +7,6 @@ venv/
 .ruff_cache/
 .pytest_cache/
 .DS_Store
+
+# Local icon source files (finals live in custom_components/mempool/brand/)
+icons-src/
