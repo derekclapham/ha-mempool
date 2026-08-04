@@ -91,6 +91,7 @@
       "next_block_fee": { "name": "Next block fee" },
       "blocks_to_halving": { "name": "Blocks to halving" },
       "block_subsidy": { "name": "Block subsidy" },
+      "next_halving": { "name": "Next halving" },
       "blocks_per_hour": { "name": "Blocks per hour" },
       "network_pace": { "name": "Network pace" },
       "top_pool": { "name": "Top mining pool" },

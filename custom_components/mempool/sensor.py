@@ -108,6 +108,21 @@ def _blocks_to_halving(height: Any) -> int | None:
     return HALVING_INTERVAL - (int(h) % HALVING_INTERVAL) if h else None
 
 
+def _next_halving_time(data: dict[str, Any]) -> datetime | None:
+    """Estimated datetime of the next halving.
+
+    Anchored to the current tip block's timestamp plus the remaining blocks at
+    Bitcoin's 10-minute (600 s) target — so it stays stable between blocks
+    rather than drifting every poll, and only nudges when a new block lands.
+    """
+    height = _num(data.get("height"))
+    anchor = _num(_block(data, "timestamp"))
+    if height is None or anchor is None:
+        return None
+    blocks_left = HALVING_INTERVAL - (int(height) % HALVING_INTERVAL)
+    return dt_util.utc_from_timestamp(anchor + blocks_left * 600)
+
+
 def _projected(data: dict[str, Any], index: int, key: str) -> Any:
     """Read a field from a projected mempool block by position."""
     proj = data.get("projected") or []
@@ -389,6 +404,15 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         suggested_display_precision=3,
         group="fast",
         value_fn=lambda d, _c: _subsidy(d.get("height")),
+    ),
+    MempoolSensorDescription(
+        key="next_halving",
+        translation_key="next_halving",
+        icon="mdi:calendar-star",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        suggested_display_precision=None,  # datetime; renders as a countdown
+        group="fast",
+        value_fn=lambda d, _c: _next_halving_time(d),
     ),
     # ---- block production rate (rolling 60 min) ----
     MempoolSensorDescription(
