@@ -8,11 +8,14 @@ from typing import Any
 import aiohttp
 
 from .const import (
+    API_BLOCKS,
     API_DIFFICULTY,
     API_FEES,
     API_HASHRATE,
     API_HISTORICAL_PRICE,
     API_MEMPOOL,
+    API_MEMPOOL_BLOCKS,
+    API_MINING_POOLS,
     API_PRICES,
     API_TIP_HEIGHT,
 )
@@ -94,3 +97,15 @@ class MempoolClient:
     async def historical_price(self, currency: str) -> dict[str, Any]:
         """Historical spot price for a currency (if the price feed is on)."""
         return await self._get(API_HISTORICAL_PRICE, {"currency": currency})
+
+    async def blocks(self) -> list[dict[str, Any]]:
+        """Recent blocks, newest first (index 0 is the chain tip)."""
+        return await self._get(API_BLOCKS)
+
+    async def mempool_blocks(self) -> list[dict[str, Any]]:
+        """Projected upcoming blocks from the current mempool."""
+        return await self._get(API_MEMPOOL_BLOCKS)
+
+    async def mining_pools(self) -> dict[str, Any]:
+        """Mining pool distribution over the last week."""
+        return await self._get(API_MINING_POOLS)

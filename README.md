@@ -43,6 +43,15 @@ Each config entry creates one device with the sensors below. All numeric sensors
 | Mempool transactions | `74,363` | |
 | Mempool size | `32.6 MvB` | Virtual size in millions of vB |
 | Mempool total fees | `0.056 BTC` | Sum of fees of all mempool txs |
+| Latest block | timestamp | Renders as "x min ago" |
+| Latest block transactions / size / median fee | `2,955` / `1.29 MB` / `1 sat/vB` | |
+| Latest block miner | `Foundry USA` | Pool that mined the tip |
+| Latest block reward / fees | `3.16 BTC` / `0.03 BTC` | Reward = subsidy + fees |
+| Projected blocks | `8` | How many blocks the current mempool would fill |
+| Next block fee | `1 sat/vB` | Median fee of the next projected block |
+| Blocks to halving | `89,032` | Countdown to the next subsidy halving |
+| Block subsidy | `3.125 BTC` | Current per-block subsidy |
+| Top mining pool / share | `Foundry USA` / `26.5 %` | Over the last week |
 
 Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode_local_8999_block_height`.
 

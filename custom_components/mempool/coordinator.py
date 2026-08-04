@@ -96,14 +96,22 @@ class MempoolFastCoordinator(_BaseCoordinator):
         super().__init__(hass, entry, client, "fast", interval)
 
     async def _fetch(self) -> dict[str, Any]:
-        # Fetch the three endpoints concurrently; any one failing raises and
+        # Fetch the endpoints concurrently; any one failing raises and
         # (via _async_update_data) fails the whole cycle, which is what we want.
-        height, fees, mempool = await asyncio.gather(
+        height, fees, mempool, blocks, projected = await asyncio.gather(
             self.client.tip_height(),
             self.client.fees_recommended(),
             self.client.mempool(),
+            self.client.blocks(),
+            self.client.mempool_blocks(),
         )
-        return {"height": height, "fees": fees, "mempool": mempool}
+        return {
+            "height": height,
+            "fees": fees,
+            "mempool": mempool,
+            "blocks": blocks,
+            "projected": projected,
+        }
 
 
 class MempoolSlowCoordinator(_BaseCoordinator):
@@ -116,11 +124,12 @@ class MempoolSlowCoordinator(_BaseCoordinator):
         super().__init__(hass, entry, client, "slow", SLOW_INTERVAL)
 
     async def _fetch(self) -> dict[str, Any]:
-        difficulty, hashrate = await asyncio.gather(
+        difficulty, hashrate, pools = await asyncio.gather(
             self.client.difficulty_adjustment(),
             self.client.hashrate(),
+            self.client.mining_pools(),
         )
-        return {"difficulty": difficulty, "hashrate": hashrate}
+        return {"difficulty": difficulty, "hashrate": hashrate, "pools": pools}
 
 
 class MempoolPriceCoordinator(_BaseCoordinator):

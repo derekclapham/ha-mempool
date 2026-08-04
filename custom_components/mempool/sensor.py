@@ -20,7 +20,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_BASE_URL, DOMAIN
+from .const import CONF_BASE_URL, DOMAIN, HALVING_INTERVAL, INITIAL_SUBSIDY
 from .coordinator import MempoolConfigEntry
 
 # Read-only sensors backed by coordinators; nothing to serialise on update.
@@ -71,6 +71,62 @@ def _scaled(value: Any, factor: float) -> float | None:
     """Divide a raw value by `factor` (e.g. sats→BTC), or None if missing."""
     v = _num(value)
     return v / factor if v is not None else None
+
+
+def _block(data: dict[str, Any], key: str) -> Any:
+    """Read a top-level field from the chain-tip block (blocks[0])."""
+    blocks = data.get("blocks") or []
+    return blocks[0].get(key) if blocks else None
+
+
+def _block_extra(data: dict[str, Any], key: str) -> Any:
+    """Read a field from the tip block's `extras` object."""
+    blocks = data.get("blocks") or []
+    return (blocks[0].get("extras") or {}).get(key) if blocks else None
+
+
+def _block_time(data: dict[str, Any]) -> datetime | None:
+    """Tip block's timestamp as a tz-aware datetime (renders as 'x ago')."""
+    ts = _num(_block(data, "timestamp"))
+    return dt_util.utc_from_timestamp(ts) if ts else None
+
+
+def _block_pool(data: dict[str, Any]) -> StateType:
+    """Name of the pool that mined the tip block."""
+    return (_block_extra(data, "pool") or {}).get("name")
+
+
+def _subsidy(height: Any) -> float | None:
+    """Current block subsidy in BTC, halving every 210k blocks."""
+    h = _num(height)
+    return INITIAL_SUBSIDY / (2 ** (int(h) // HALVING_INTERVAL)) if h else None
+
+
+def _blocks_to_halving(height: Any) -> int | None:
+    """Blocks remaining until the next subsidy halving."""
+    h = _num(height)
+    return HALVING_INTERVAL - (int(h) % HALVING_INTERVAL) if h else None
+
+
+def _projected(data: dict[str, Any], index: int, key: str) -> Any:
+    """Read a field from a projected mempool block by position."""
+    proj = data.get("projected") or []
+    return proj[index].get(key) if len(proj) > index else None
+
+
+def _pools(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """The mining-pool list from the last-week distribution."""
+    return ((data.get("pools") or {}).get("pools")) or []
+
+
+def _top_pool_share(data: dict[str, Any]) -> float | None:
+    """Share (%) of blocks mined by the top pool over the window."""
+    pools = _pools(data)
+    if not pools:
+        return None
+    total = sum(_num(p.get("blockCount")) or 0 for p in pools)
+    top = _num(pools[0].get("blockCount")) or 0
+    return top / total * 100 if total else None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -179,6 +235,116 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         # total_fee is in satoshis; 1 BTC = 100,000,000 sats.
         value_fn=lambda d, _c: _scaled(_mp(d, "total_fee"), 100_000_000),
     ),
+    # ---- latest block ----
+    MempoolSensorDescription(
+        key="latest_block_time",
+        translation_key="latest_block_time",
+        icon="mdi:cube",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        suggested_display_precision=None,  # datetime; renders as "x min ago"
+        group="fast",
+        value_fn=lambda d, _c: _block_time(d),
+    ),
+    MempoolSensorDescription(
+        key="latest_block_transactions",
+        translation_key="latest_block_transactions",
+        icon="mdi:swap-horizontal",
+        native_unit_of_measurement="tx",
+        state_class=SensorStateClass.MEASUREMENT,
+        group="fast",
+        value_fn=lambda d, _c: _block(d, "tx_count"),
+    ),
+    MempoolSensorDescription(
+        key="latest_block_size",
+        translation_key="latest_block_size",
+        icon="mdi:database",
+        native_unit_of_measurement="MB",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        group="fast",
+        # block size is in bytes; show megabytes.
+        value_fn=lambda d, _c: _scaled(_block(d, "size"), 1_000_000),
+    ),
+    MempoolSensorDescription(
+        key="latest_block_miner",
+        translation_key="latest_block_miner",
+        icon="mdi:pickaxe",
+        suggested_display_precision=None,  # string
+        group="fast",
+        value_fn=lambda d, _c: _block_pool(d),
+    ),
+    MempoolSensorDescription(
+        key="latest_block_reward",
+        translation_key="latest_block_reward",
+        icon="mdi:cash-plus",
+        native_unit_of_measurement="BTC",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        group="fast",
+        # reward = subsidy + fees, in satoshis.
+        value_fn=lambda d, _c: _scaled(_block_extra(d, "reward"), 100_000_000),
+    ),
+    MempoolSensorDescription(
+        key="latest_block_fees",
+        translation_key="latest_block_fees",
+        icon="mdi:cash",
+        native_unit_of_measurement="BTC",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        group="fast",
+        value_fn=lambda d, _c: _scaled(_block_extra(d, "totalFees"), 100_000_000),
+    ),
+    MempoolSensorDescription(
+        key="latest_block_median_fee",
+        translation_key="latest_block_median_fee",
+        icon="mdi:cash-clock",
+        native_unit_of_measurement="sat/vB",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        group="fast",
+        value_fn=lambda d, _c: _block_extra(d, "medianFee"),
+    ),
+    # ---- mempool projection (next blocks) ----
+    MempoolSensorDescription(
+        key="projected_blocks",
+        translation_key="projected_blocks",
+        icon="mdi:layers-triple",
+        native_unit_of_measurement="blocks",
+        state_class=SensorStateClass.MEASUREMENT,
+        group="fast",
+        # how many blocks the current mempool would fill.
+        value_fn=lambda d, _c: len(d.get("projected") or []),
+    ),
+    MempoolSensorDescription(
+        key="next_block_fee",
+        translation_key="next_block_fee",
+        icon="mdi:cube-send",
+        native_unit_of_measurement="sat/vB",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        group="fast",
+        value_fn=lambda d, _c: _projected(d, 0, "medianFee"),
+    ),
+    # ---- halving (computed from the chain tip height) ----
+    MempoolSensorDescription(
+        key="blocks_to_halving",
+        translation_key="blocks_to_halving",
+        icon="mdi:sync",
+        native_unit_of_measurement="blocks",
+        state_class=SensorStateClass.MEASUREMENT,
+        group="fast",
+        value_fn=lambda d, _c: _blocks_to_halving(d.get("height")),
+    ),
+    MempoolSensorDescription(
+        key="block_subsidy",
+        translation_key="block_subsidy",
+        icon="mdi:bitcoin",
+        native_unit_of_measurement="BTC",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        group="fast",
+        value_fn=lambda d, _c: _subsidy(d.get("height")),
+    ),
     # ---- slow group (difficulty adjustment, mining) ----
     MempoolSensorDescription(
         key="difficulty_progress",
@@ -214,6 +380,7 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         translation_key="next_retarget",
         icon="mdi:calendar-clock",
         device_class=SensorDeviceClass.TIMESTAMP,
+        suggested_display_precision=None,  # precision is meaningless for a datetime
         group="slow",
         value_fn=lambda d, _c: _retarget(d),
     ),
@@ -238,6 +405,25 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         group="slow",
         # Difficulty is a huge dimensionless number; show trillions (T).
         value_fn=lambda d, _c: _scaled(_hash(d, "currentDifficulty"), 1e12),
+    ),
+    # ---- mining pools (last week) ----
+    MempoolSensorDescription(
+        key="top_pool",
+        translation_key="top_pool",
+        icon="mdi:account-hard-hat",
+        suggested_display_precision=None,  # string
+        group="slow",
+        value_fn=lambda d, _c: (_pools(d)[0].get("name") if _pools(d) else None),
+    ),
+    MempoolSensorDescription(
+        key="top_pool_share",
+        translation_key="top_pool_share",
+        icon="mdi:chart-pie",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        group="slow",
+        value_fn=lambda d, _c: _top_pool_share(d),
     ),
 )
 
