@@ -17,6 +17,7 @@ from .const import (
     API_MEMPOOL_BLOCKS,
     API_MINING_POOLS,
     API_PRICES,
+    API_REWARD_STATS,
     API_TIP_HEIGHT,
 )
 
@@ -109,3 +110,7 @@ class MempoolClient:
     async def mining_pools(self) -> dict[str, Any]:
         """Mining pool distribution over the last week."""
         return await self._get(API_MINING_POOLS)
+
+    async def reward_stats(self) -> dict[str, Any]:
+        """Reward/fee totals over the last 144 blocks (~24h)."""
+        return await self._get(API_REWARD_STATS)

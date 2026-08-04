@@ -34,6 +34,7 @@ class MempoolData:
 
     client: MempoolClient
     currency: str | None
+    price_attributes: bool  # expose the other fiats as price-sensor attributes
     fast: MempoolFastCoordinator
     slow: MempoolSlowCoordinator
     price: MempoolPriceCoordinator | None
@@ -124,12 +125,18 @@ class MempoolSlowCoordinator(_BaseCoordinator):
         super().__init__(hass, entry, client, "slow", SLOW_INTERVAL)
 
     async def _fetch(self) -> dict[str, Any]:
-        difficulty, hashrate, pools = await asyncio.gather(
+        difficulty, hashrate, pools, rewards = await asyncio.gather(
             self.client.difficulty_adjustment(),
             self.client.hashrate(),
             self.client.mining_pools(),
+            self.client.reward_stats(),
         )
-        return {"difficulty": difficulty, "hashrate": hashrate, "pools": pools}
+        return {
+            "difficulty": difficulty,
+            "hashrate": hashrate,
+            "pools": pools,
+            "rewards": rewards,
+        }
 
 
 class MempoolPriceCoordinator(_BaseCoordinator):

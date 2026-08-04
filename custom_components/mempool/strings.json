@@ -19,7 +19,11 @@
         "title": "Price currency",
         "description": "Your instance publishes a price feed. Pick which fiat the price sensor should report.",
         "data": {
-          "currency": "Currency"
+          "currency": "Currency",
+          "price_attributes": "Expose other currencies as attributes"
+        },
+        "data_description": {
+          "price_attributes": "Optionally attach every other fiat your instance serves to the price sensor as attributes, for templating. These are not recorded as long-term statistics."
         }
       }
     },
@@ -37,12 +41,14 @@
         "data": {
           "fast_interval": "Fast poll interval (seconds)",
           "verify_ssl": "Verify SSL certificate",
-          "currency": "Price currency"
+          "currency": "Price currency",
+          "price_attributes": "Expose other currencies as attributes"
         },
         "data_description": {
           "fast_interval": "How often to poll chain tip, fees and mempool.",
           "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
-          "currency": "Changing this starts a new price-history series; the previous currency's sensor keeps its history but stops updating. Re-run the Import price history action afterwards."
+          "currency": "Changing this starts a new price-history series; the previous currency's sensor keeps its history but stops updating. Re-run the Import price history action afterwards.",
+          "price_attributes": "Attach every other fiat your instance serves to the price sensor as attributes (for templating; not recorded as statistics)."
         }
       }
     }
@@ -80,6 +86,9 @@
       "network_pace": { "name": "Network pace" },
       "top_pool": { "name": "Top mining pool" },
       "top_pool_share": { "name": "Top pool share" },
+      "mining_reward_24h": { "name": "Mining reward (24h)" },
+      "mining_fees_24h": { "name": "Mining fees (24h)" },
+      "mean_tx_fee_24h": { "name": "Mean transaction fee (24h)" },
       "price": { "name": "BTC price" }
     }
   },

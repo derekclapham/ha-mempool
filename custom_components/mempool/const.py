@@ -19,6 +19,7 @@ CONF_BASE_URL = "base_url"
 CONF_CURRENCY = "currency"
 CONF_FAST_INTERVAL = "fast_interval"
 CONF_VERIFY_SSL = "verify_ssl"
+CONF_PRICE_ATTRIBUTES = "price_attributes"  # opt-in: other fiats as attributes
 
 DEFAULT_NAME = "Mempool"
 DEFAULT_FAST_INTERVAL = 60  # seconds — chain tip/fees/mempool don't change faster
@@ -54,6 +55,8 @@ API_HISTORICAL_PRICE = "/api/v1/historical-price"
 API_BLOCKS = "/api/v1/blocks"
 API_MEMPOOL_BLOCKS = "/api/v1/fees/mempool-blocks"
 API_MINING_POOLS = "/api/v1/mining/pools/1w"
+# reward-stats over the last 144 blocks (~24h): {totalReward, totalFee, totalTx}
+API_REWARD_STATS = "/api/v1/mining/reward-stats/144"
 
 # Bitcoin constants for computed sensors.
 HALVING_INTERVAL = 210_000  # blocks between subsidy halvings

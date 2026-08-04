@@ -151,6 +151,18 @@ def _network_pace(data: dict[str, Any]) -> float | None:
     return n / 6 * 100 if n is not None else None
 
 
+def _reward(data: dict[str, Any], key: str) -> Any:
+    """Read a field from the 144-block reward-stats object (values are strings)."""
+    return (data.get("rewards") or {}).get(key)
+
+
+def _mean_tx_fee(data: dict[str, Any]) -> float | None:
+    """Mean fee per transaction over the last 144 blocks, in satoshis."""
+    fee = _num(_reward(data, "totalFee"))
+    tx = _num(_reward(data, "totalTx"))
+    return fee / tx if fee is not None and tx else None
+
+
 @dataclass(frozen=True, kw_only=True)
 class MempoolSensorDescription(SensorEntityDescription):
     """Describes a Mempool sensor and where its value comes from.
@@ -478,6 +490,37 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         group="slow",
         value_fn=lambda d, _c: _top_pool_share(d),
     ),
+    # ---- mining reward stats (last ~24h / 144 blocks) ----
+    MempoolSensorDescription(
+        key="mining_reward_24h",
+        translation_key="mining_reward_24h",
+        icon="mdi:cash-plus",
+        native_unit_of_measurement="BTC",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        group="slow",
+        # totalReward (subsidy + fees) in satoshis over the last 144 blocks.
+        value_fn=lambda d, _c: _scaled(_reward(d, "totalReward"), 100_000_000),
+    ),
+    MempoolSensorDescription(
+        key="mining_fees_24h",
+        translation_key="mining_fees_24h",
+        icon="mdi:cash",
+        native_unit_of_measurement="BTC",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        group="slow",
+        value_fn=lambda d, _c: _scaled(_reward(d, "totalFee"), 100_000_000),
+    ),
+    MempoolSensorDescription(
+        key="mean_tx_fee_24h",
+        translation_key="mean_tx_fee_24h",
+        icon="mdi:cash-clock",
+        native_unit_of_measurement="sat",
+        state_class=SensorStateClass.MEASUREMENT,
+        group="slow",
+        value_fn=lambda d, _c: _mean_tx_fee(d),
+    ),
 )
 
 # Defined separately because it only exists when a price feed is present, and
@@ -509,7 +552,13 @@ async def async_setup_entry(
     # Add the price sensor only when a price coordinator was created.
     if data.price is not None and data.currency:
         entities.append(
-            MempoolSensor(data.price, entry, PRICE_SENSOR, data.currency)
+            MempoolSensor(
+                data.price,
+                entry,
+                PRICE_SENSOR,
+                data.currency,
+                expose_currencies=data.price_attributes,
+            )
         )
     async_add_entities(entities)
 
@@ -526,11 +575,14 @@ class MempoolSensor(CoordinatorEntity, SensorEntity):
         entry: MempoolConfigEntry,
         description: MempoolSensorDescription,
         currency: str | None,
+        expose_currencies: bool = False,
     ) -> None:
         """Bind the sensor to its coordinator and config entry."""
         super().__init__(coordinator)
         self.entity_description = description
         self._currency = currency
+        # Only the price sensor, and only when the user opted in.
+        self._expose_currencies = expose_currencies
         # The price sensor's unique_id carries the currency so switching fiats
         # yields a distinct statistic rather than mixing units in one series.
         self._attr_unique_id = (
@@ -566,3 +618,22 @@ class MempoolSensor(CoordinatorEntity, SensorEntity):
         sensor whose specific field is missing from an otherwise-good payload.
         """
         return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Opt-in extra fiats on the price sensor (for templating, no stats).
+
+        Attributes are not recorded as long-term statistics — they exist purely
+        so automations/templates can read a currency other than the one chosen.
+        """
+        if not self._expose_currencies:
+            return None
+        prices = (self.coordinator.data or {}).get("prices") or {}
+        return {
+            code: value
+            for code, value in prices.items()
+            if code.isalpha()
+            and len(code) == 3
+            and code.isupper()
+            and code != self._currency
+        }

@@ -55,6 +55,9 @@ Each config entry creates one device with the sensors below. All numeric sensors
 | Blocks per hour | `7` | Blocks mined in the last rolling 60 min (target is 6) |
 | Network pace | `117 %` | Block rate vs the 10-min target — 100% = on schedule |
 | Top mining pool / share | `Foundry USA` / `26.5 %` | Over the last week |
+| Mining reward (24h) | `453 BTC` | Total miner reward (subsidy + fees) over the last ~144 blocks |
+| Mining fees (24h) | `3.9 BTC` | Total fees over the last ~144 blocks |
+| Mean transaction fee (24h) | `615 sat` | Average fee per transaction over ~144 blocks |
 
 Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode_local_8999_block_height`.
 
@@ -83,6 +86,16 @@ Polling cadence:
 | Slow | Difficulty adjustment, hashrate | 10 minutes |
 
 The fast interval, SSL verification and price currency can all be changed later via the integration's **Configure** (options) — set the interval high for public instances.
+
+### Other currencies as attributes (opt-in)
+
+At setup (and under **Configure**) you can tick **Expose other currencies as attributes**. When on, every other fiat your instance serves is attached to the price sensor as an attribute, so a template can read any of them:
+
+```jinja
+{{ state_attr('sensor.mempool_<host>_btc_price', 'EUR') }}
+```
+
+These attributes are **not** recorded as long-term statistics (only the sensor's chosen-currency state is) — they're purely for templating. Left off by default to keep the recorder lean.
 
 ### Changing the currency
 

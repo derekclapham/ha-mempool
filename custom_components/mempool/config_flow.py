@@ -31,6 +31,7 @@ from .const import (
     CONF_BASE_URL,
     CONF_CURRENCY,
     CONF_FAST_INTERVAL,
+    CONF_PRICE_ATTRIBUTES,
     CONF_VERIFY_SSL,
     DEFAULT_FAST_INTERVAL,
     DEFAULT_NAME,
@@ -153,6 +154,7 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick which fiat the price sensor reports."""
         if user_input is not None:
             self._data[CONF_CURRENCY] = user_input[CONF_CURRENCY]
+            self._data[CONF_PRICE_ATTRIBUTES] = user_input[CONF_PRICE_ATTRIBUTES]
             return self._create()
 
         default = _currency_default(self.hass, self._currencies, None)
@@ -162,7 +164,10 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
                     SelectSelectorConfig(
                         options=self._currencies, mode=SelectSelectorMode.DROPDOWN
                     )
-                )
+                ),
+                # Opt-in: also expose every other fiat as a price-sensor
+                # attribute (handy for templates; not recorded as statistics).
+                vol.Required(CONF_PRICE_ATTRIBUTES, default=False): BooleanSelector(),
             }
         )
         return self.async_show_form(step_id="currency", data_schema=schema)
@@ -205,6 +210,9 @@ class MempoolOptionsFlow(OptionsFlow):
         current_currency = entry.options.get(
             CONF_CURRENCY, entry.data.get(CONF_CURRENCY)
         )
+        current_attributes = entry.options.get(
+            CONF_PRICE_ATTRIBUTES, entry.data.get(CONF_PRICE_ATTRIBUTES, False)
+        )
 
         if user_input is not None:
             return self.async_create_entry(data=user_input)
@@ -232,5 +240,8 @@ class MempoolOptionsFlow(OptionsFlow):
                     options=currencies, mode=SelectSelectorMode.DROPDOWN
                 )
             )
+            schema[
+                vol.Required(CONF_PRICE_ATTRIBUTES, default=current_attributes)
+            ] = BooleanSelector()
 
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
