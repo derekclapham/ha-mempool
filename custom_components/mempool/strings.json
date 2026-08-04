@@ -2,8 +2,16 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to your mempool instance",
-        "description": "Enter the base URL of your mempool web server — your own self-hosted node, or a public instance.",
+        "title": "Add a mempool instance",
+        "description": "Use the public mempool.space, or connect to your own self-hosted instance.",
+        "menu_options": {
+          "mempool_space": "mempool.space (public)",
+          "self_hosted": "Self-hosted instance"
+        }
+      },
+      "self_hosted": {
+        "title": "Self-hosted instance",
+        "description": "Enter the base URL of your mempool web server.",
         "data": {
           "base_url": "Base URL",
           "verify_ssl": "Verify SSL certificate",
@@ -12,7 +20,7 @@
         "data_description": {
           "base_url": "Include the scheme, host and port. If it is behind a reverse proxy, enter the proxy's address.",
           "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
-          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool). Poll public instances gently."
+          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool)."
         }
       },
       "currency": {
@@ -31,7 +39,8 @@
       "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API."
     },
     "abort": {
-      "already_configured": "This mempool instance is already configured."
+      "already_configured": "This mempool instance is already configured.",
+      "cannot_connect": "Could not reach mempool.space right now. Please try again."
     }
   },
   "options": {

@@ -25,6 +25,11 @@ DEFAULT_NAME = "Mempool"
 DEFAULT_FAST_INTERVAL = 60  # seconds — chain tip/fees/mempool don't change faster
 DEFAULT_VERIFY_SSL = True  # off lets an instance behind self-signed HTTPS work
 
+# The public instance: a fixed URL and a gentle, locked poll interval so we
+# don't hammer their shared API. Self-hosted users pick their own URL/interval.
+MEMPOOL_SPACE_URL = "https://mempool.space"
+PUBLIC_FAST_INTERVAL = 300  # seconds — locked for the public instance
+
 # Fixed poll intervals for the two groups that don't warrant user tuning.
 # Price moves slowly enough that 5 min is plenty; difficulty/hashrate barely
 # move within a 10 min window (retargets are ~2 weeks apart).
