@@ -85,6 +85,10 @@ class MempoolSensorDescription(SensorEntityDescription):
 
     group: str
     value_fn: Callable[[dict[str, Any], str | None], StateType | datetime]
+    # Default integer sensors (block height, fees, counts) to whole numbers so
+    # their history-graph axes don't render interpolated decimal ticks. Sensors
+    # with fractional units override this below; the timestamp sensor ignores it.
+    suggested_display_precision: int | None = 0
 
 
 # The non-price sensors, in display order. `suggested_display_precision` only
