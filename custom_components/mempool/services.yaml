@@ -1,0 +1,7 @@
+import_price_history:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: mempool

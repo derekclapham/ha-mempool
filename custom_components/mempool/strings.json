@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to your mempool instance",
+        "description": "Enter the base URL of your mempool web server — your own self-hosted node, or a public instance.",
+        "data": {
+          "base_url": "Base URL",
+          "verify_ssl": "Verify SSL certificate",
+          "fast_interval": "Fast poll interval (seconds)"
+        },
+        "data_description": {
+          "base_url": "Include the scheme, host and port. If it is behind a reverse proxy, enter the proxy's address.",
+          "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
+          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool). Poll public instances gently."
+        }
+      },
+      "currency": {
+        "title": "Price currency",
+        "description": "Your instance publishes a price feed. Pick which fiat the price sensor should report.",
+        "data": {
+          "currency": "Currency"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API."
+    },
+    "abort": {
+      "already_configured": "This mempool instance is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Mempool options",
+        "data": {
+          "fast_interval": "Fast poll interval (seconds)",
+          "verify_ssl": "Verify SSL certificate",
+          "currency": "Price currency"
+        },
+        "data_description": {
+          "fast_interval": "How often to poll chain tip, fees and mempool.",
+          "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
+          "currency": "Changing this starts a new price-history series; the previous currency's sensor keeps its history but stops updating. Re-run the Import price history action afterwards."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "block_height": { "name": "Block height" },
+      "fee_fastest": { "name": "Fee (fastest)" },
+      "fee_half_hour": { "name": "Fee (30 min)" },
+      "fee_hour": { "name": "Fee (1 hour)" },
+      "fee_economy": { "name": "Fee (economy)" },
+      "fee_minimum": { "name": "Fee (minimum)" },
+      "mempool_transactions": { "name": "Mempool transactions" },
+      "mempool_size": { "name": "Mempool size" },
+      "mempool_total_fees": { "name": "Mempool total fees" },
+      "difficulty_progress": { "name": "Difficulty adjustment progress" },
+      "difficulty_change": { "name": "Estimated difficulty change" },
+      "blocks_to_retarget": { "name": "Blocks to retarget" },
+      "next_retarget": { "name": "Next difficulty retarget" },
+      "hashrate": { "name": "Network hashrate" },
+      "difficulty": { "name": "Network difficulty" },
+      "price": { "name": "BTC price" }
+    }
+  },
+  "services": {
+    "import_price_history": {
+      "name": "Import price history",
+      "description": "Backfill Home Assistant long-term statistics for the price sensor from the node's historical-price feed, so price charts are rich immediately.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Mempool instance",
+          "description": "The mempool instance whose price history should be imported."
+        }
+      }
+    }
+  }
+}
