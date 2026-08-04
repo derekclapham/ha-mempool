@@ -129,6 +129,28 @@ def _top_pool_share(data: dict[str, Any]) -> float | None:
     return top / total * 100 if total else None
 
 
+def _blocks_last_hour(data: dict[str, Any]) -> int | None:
+    """Blocks whose timestamp falls within the last 60 minutes.
+
+    Uses the recent-blocks list (capped at ~15), which comfortably covers an
+    hour unless the network is producing >15 blocks/hour (effectively never).
+    """
+    blocks = data.get("blocks") or []
+    if not blocks:
+        return None
+    cutoff = dt_util.utcnow().timestamp() - 3600
+    return sum(1 for b in blocks if (_num(b.get("timestamp")) or 0) >= cutoff)
+
+
+def _network_pace(data: dict[str, Any]) -> float | None:
+    """Block-production rate vs the 6-blocks/hour target, as a percentage.
+
+    100% means exactly on the 10-minute-per-block schedule; below is slow.
+    """
+    n = _blocks_last_hour(data)
+    return n / 6 * 100 if n is not None else None
+
+
 @dataclass(frozen=True, kw_only=True)
 class MempoolSensorDescription(SensorEntityDescription):
     """Describes a Mempool sensor and where its value comes from.
@@ -344,6 +366,26 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         suggested_display_precision=3,
         group="fast",
         value_fn=lambda d, _c: _subsidy(d.get("height")),
+    ),
+    # ---- block production rate (rolling 60 min) ----
+    MempoolSensorDescription(
+        key="blocks_per_hour",
+        translation_key="blocks_per_hour",
+        icon="mdi:timer-sand",
+        native_unit_of_measurement="blocks/h",
+        state_class=SensorStateClass.MEASUREMENT,
+        group="fast",
+        value_fn=lambda d, _c: _blocks_last_hour(d),
+    ),
+    MempoolSensorDescription(
+        key="network_pace",
+        translation_key="network_pace",
+        icon="mdi:speedometer",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        group="fast",
+        # 100% = on the 6-blocks/hour (10-min) schedule.
+        value_fn=lambda d, _c: _network_pace(d),
     ),
     # ---- slow group (difficulty adjustment, mining) ----
     MempoolSensorDescription(

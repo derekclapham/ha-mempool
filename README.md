@@ -51,6 +51,8 @@ Each config entry creates one device with the sensors below. All numeric sensors
 | Next block fee | `1 sat/vB` | Median fee of the next projected block |
 | Blocks to halving | `89,032` | Countdown to the next subsidy halving |
 | Block subsidy | `3.125 BTC` | Current per-block subsidy |
+| Blocks per hour | `7` | Blocks mined in the last rolling 60 min (target is 6) |
+| Network pace | `117 %` | Block rate vs the 10-min target — 100% = on schedule |
 | Top mining pool / share | `Foundry USA` / `26.5 %` | Over the last week |
 
 Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode_local_8999_block_height`.
