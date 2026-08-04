@@ -1,6 +1,6 @@
 {
   "domain": "mempool",
-  "name": "Mempool (self-hosted Bitcoin node)",
+  "name": "Bitcoin Mempool",
   "after_dependencies": [
     "recorder"
   ],

@@ -1,29 +1,30 @@
-# Mempool for Home Assistant
+# Bitcoin Mempool for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![Validate](https://github.com/derekclapham/ha-mempool/actions/workflows/validate.yaml/badge.svg)](https://github.com/derekclapham/ha-mempool/actions/workflows/validate.yaml)
 
-A Home Assistant integration for a **self-hosted [mempool](https://github.com/mempool/mempool) instance** (Bitcoin Core + mempool +, typically, an Electrum server such as Fulcrum). Point it at your own node and get native Bitcoin sensors — price, on-chain status, fees and mempool state — with **no third-party API calls**. It also works against the public `https://mempool.space`.
+A Home Assistant integration for [mempool](https://github.com/mempool/mempool) — the Bitcoin blockchain and mempool explorer. Point it at the **public mempool.space** or **your own self-hosted instance** and get native Bitcoin sensors: price, latest block, on-chain status, fees, mempool state, mining, network pace and more (~35 sensors).
 
-Unlike the existing options (Home Assistant's core `bitcoin`/`blockchain` integrations and CoinGecko-based cards), this talks **directly to your node** over its local API, and can **backfill years of price history** into Home Assistant's long-term statistics in one call.
+Unlike Home Assistant's core `bitcoin`/`blockchain` integrations (which rely on third-party services), this talks to a real mempool instance — including your own node for a fully local setup — and can **backfill years of price history** into long-term statistics in one call.
 
 ## Features
 
-- 🔒 **Self-hosted first** — all data comes from your instance's REST API over your LAN.
-- 🖥️ **UI config flow** — just enter your instance URL. No YAML.
-- 💰 **Price in your currency** — the setup offers only the fiats your instance actually serves.
-- 📈 **Instant price history** — the `mempool.import_price_history` service backfills long-term statistics from the node's `historical-price` feed.
-- ⚙️ **Tunable polling** — three internal coordinators (fast / price / slow); the fast interval is adjustable so you can be gentle with public instances.
+- 🟠 **Public or self-hosted** — choose **mempool.space** in one step, or enter your own instance's URL.
+- 🖥️ **UI config flow** — no YAML.
+- 🧱 **Rich Bitcoin data** — price, latest block (miner, size, weight, reward, fees, median fee), difficulty and adjustment, fee tiers, mempool projection, halving countdown, top mining pool, network pace, and 24-hour mining reward stats.
+- 💰 **Price in your currency** — pick from the fiats your instance serves; optionally expose the rest as attributes for templating.
+- 📈 **Instant price history** — the `mempool.import_price_history` service backfills long-term statistics from the `historical-price` feed.
+- ⚙️ **Respectful polling** — three internal coordinators by cadence; self-hosted users tune the fast interval, while the public instance is locked to a gentle 5-minute poll.
 
 ## Requirements
 
 - Home Assistant **2025.1** or newer.
-- A reachable [mempool](https://github.com/mempool/mempool) instance (your own, or `https://mempool.space`). The base URL must be reachable **from the Home Assistant host** — mind VLANs/firewalls if your node lives on a different subnet.
-- The **BTC price** sensor requires the instance's optional **price feed** to be enabled. On-chain, fee and mempool sensors work regardless; if the price feed is off the integration simply sets up without the price sensor.
+- Either the public **mempool.space**, or a reachable [mempool](https://github.com/mempool/mempool) instance of your own. A self-hosted URL must be reachable **from the Home Assistant host** (mind VLANs/firewalls if it's on another subnet).
+- The **BTC price** sensor needs the instance's optional **price feed** enabled (mempool.space has it). On-chain, fee, mempool and mining sensors work regardless; without a price feed the integration simply sets up without the price sensor.
 
-### Reverse proxies & HTTPS
+### Reverse proxies & HTTPS (self-hosted)
 
-A reverse proxy (nginx, Traefik, Caddy, Cloudflare Tunnel, …) in front of your instance needs no special support — just enter the **proxy's** URL as the base URL. For an HTTPS endpoint with a **self-signed** certificate, turn off **Verify SSL certificate** during setup. HTTP basic auth is not yet supported (planned).
+A reverse proxy (nginx, Traefik, Caddy, Cloudflare Tunnel, …) in front of your instance needs no special support — just enter the **proxy's** URL. For an HTTPS endpoint with a **self-signed** certificate, turn off **Verify SSL certificate** during setup. HTTP basic auth is not yet supported (planned).
 
 ## Sensors
 
@@ -31,7 +32,7 @@ Each config entry creates one device with the sensors below. All numeric sensors
 
 | Sensor | Example | Notes |
 | --- | --- | --- |
-| BTC price | `A$90,962` | In the currency you pick — only if the price feed is enabled |
+| BTC price | `$63,782` | In the currency you pick — only if the price feed is enabled |
 | Block height | `960,956` | Current chain tip |
 | Network hashrate | `937 EH/s` | From the 3-day mining average |
 | Network difficulty | `126.23 T` | Trillions |
@@ -66,8 +67,8 @@ Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode
 ### HACS (recommended)
 
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/derekclapham/ha-mempool`, category **Integration**.
-2. Install **Mempool (self-hosted Bitcoin node)** and restart Home Assistant.
-3. **Settings → Devices & Services → Add Integration → Mempool**.
+2. Install **Bitcoin Mempool** and restart Home Assistant.
+3. **Settings → Devices & Services → Add Integration → Bitcoin Mempool**.
 
 ### Manual
 
@@ -75,17 +76,22 @@ Copy `custom_components/mempool` into your Home Assistant `config/custom_compone
 
 ## Configuration
 
-Enter your instance's **base URL**, e.g. `http://mynode.local:8999` or `https://mempool.space`. The integration verifies it by calling `/api/v1/difficulty-adjustment` (which proves it's really a mempool API, not just a reverse proxy that answers). If a price feed is present, it then asks which currency to report — the dropdown lists only the fiats your instance actually publishes.
+At setup, choose your instance:
+
+- **mempool.space (public)** — no URL needed. Uses `https://mempool.space` and a fixed, gentle **5-minute** poll to respect the shared public API. The interval and SSL settings are locked.
+- **Self-hosted instance** — enter your **base URL** (e.g. `http://mynode.local:8999`), optionally turn off **Verify SSL certificate** for a self-signed cert, and set the **fast poll interval**.
+
+Either way, the URL is verified (via `/api/v1/difficulty-adjustment`, proving it's really a mempool API), then — if a price feed is present — you pick which currency to report (only the fiats the instance actually serves).
 
 Polling cadence:
 
 | Group | Data | Interval |
 | --- | --- | --- |
-| Fast | Chain tip, fees, mempool | **Configurable** (default 60 s, 15–3600 s) |
+| Fast | Chain tip, latest block, fees, mempool, projection | Self-hosted: **configurable** (default 60 s, 15–3600 s). Public: **300 s (locked)** |
 | Price | Spot price | 5 minutes |
-| Slow | Difficulty adjustment, hashrate | 10 minutes |
+| Slow | Difficulty adjustment, hashrate, mining pool, reward stats | 10 minutes |
 
-The fast interval, SSL verification and price currency can all be changed later via the integration's **Configure** (options) — set the interval high for public instances.
+For a self-hosted instance, the fast interval, SSL verification and currency can be changed later under **Configure**. For the public instance, only the currency (and the attributes toggle below) are editable.
 
 ### Other currencies as attributes (opt-in)
 
@@ -108,10 +114,10 @@ Once set up, call the service to fill in historical price statistics:
 ```yaml
 action: mempool.import_price_history
 data:
-  config_entry_id: <your mempool entry>
+  config_entry_id: <your Bitcoin Mempool entry>
 ```
 
-This pulls the node's `historical-price` feed for your currency, hour-aligns it, drops any placeholder points, and imports it as long-term statistics for the price sensor — so a history card is rich immediately instead of filling in over time. Safe to run more than once (it upserts per hour).
+This pulls the `historical-price` feed for your current currency, hour-aligns it, drops any placeholder points, and imports it as long-term statistics for the price sensor — so a history card is rich immediately instead of filling in over time. Safe to run more than once (it upserts per hour).
 
 > **Note:** freshly imported statistics can take a minute or two to appear in *daily*-aggregated views; *hourly* views show them right away.
 
@@ -123,7 +129,7 @@ With the [apexcharts-card](https://github.com/RomRider/apexcharts-card) HACS car
 type: custom:apexcharts-card
 header:
   show: true
-  title: BTC / AUD — full history
+  title: BTC / USD — full history
 graph_span: 6y
 span:
   end: day
@@ -137,20 +143,19 @@ series:
 
 ## Troubleshooting
 
-- **"Failed to connect" during setup** — the URL must be reachable from the Home Assistant host. Test it: `curl http://<host>:<port>/api/v1/difficulty-adjustment`. Check VLAN/firewall rules if the node is on another subnet.
+- **"Failed to connect" during setup (self-hosted)** — the URL must be reachable from the Home Assistant host. Test it: `curl http://<host>:<port>/api/v1/difficulty-adjustment`. Check VLAN/firewall rules if the node is on another subnet.
 - **No price sensor** — the instance's price feed is disabled, or didn't return your currency. On-chain sensors are unaffected.
+- **Can't find "Expose other currencies" under Configure** — it appears below the currency dropdown; hard-refresh your browser (Home Assistant caches integration translations), and note it only shows when the price feed is reachable.
 - **History card empty after backfill** — give the recorder a minute for daily aggregation, or use an hourly `period` in the card.
 
 ## Endpoints used
 
-`/api/blocks/tip/height`, `/api/v1/difficulty-adjustment`, `/api/v1/fees/recommended`, `/api/mempool`, `/api/v1/mining/hashrate/3d`, `/api/v1/prices`, `/api/v1/historical-price`.
+`/api/blocks/tip/height`, `/api/v1/difficulty-adjustment`, `/api/v1/fees/recommended`, `/api/v1/fees/mempool-blocks`, `/api/mempool`, `/api/v1/blocks`, `/api/v1/mining/hashrate/3d`, `/api/v1/mining/pools/1w`, `/api/v1/mining/reward-stats/144`, `/api/v1/prices`, `/api/v1/historical-price`.
 
 ## Roadmap
 
-Not in v0.1.0, planned for later:
-
+- Listing in the **HACS default store** (requires a [home-assistant/brands](https://github.com/home-assistant/brands) PR — in progress).
 - HTTP basic auth for protected instances.
-- A logo in the Home Assistant UI (requires a separate PR to [home-assistant/brands](https://github.com/home-assistant/brands)).
 - Automated tests and a diagnostics download.
 
 ## Disclaimer
