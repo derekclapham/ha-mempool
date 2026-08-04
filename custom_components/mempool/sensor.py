@@ -288,6 +288,17 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         value_fn=lambda d, _c: _scaled(_block(d, "size"), 1_000_000),
     ),
     MempoolSensorDescription(
+        key="latest_block_weight",
+        translation_key="latest_block_weight",
+        icon="mdi:weight",
+        native_unit_of_measurement="MWU",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        group="fast",
+        # weight is in weight units; show millions (a full block is ~4 MWU).
+        value_fn=lambda d, _c: _scaled(_block(d, "weight"), 1_000_000),
+    ),
+    MempoolSensorDescription(
         key="latest_block_miner",
         translation_key="latest_block_miner",
         icon="mdi:pickaxe",

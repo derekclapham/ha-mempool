@@ -67,6 +67,7 @@
       "latest_block_time": { "name": "Latest block" },
       "latest_block_transactions": { "name": "Latest block transactions" },
       "latest_block_size": { "name": "Latest block size" },
+      "latest_block_weight": { "name": "Latest block weight" },
       "latest_block_miner": { "name": "Latest block miner" },
       "latest_block_reward": { "name": "Latest block reward" },
       "latest_block_fees": { "name": "Latest block fees" },

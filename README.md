@@ -45,6 +45,7 @@ Each config entry creates one device with the sensors below. All numeric sensors
 | Mempool total fees | `0.056 BTC` | Sum of fees of all mempool txs |
 | Latest block | timestamp | Renders as "x min ago" |
 | Latest block transactions / size / median fee | `2,955` / `1.29 MB` / `1 sat/vB` | |
+| Latest block weight | `3.99 MWU` | Consensus limit is 4 MWU (= 4M weight units) |
 | Latest block miner | `Foundry USA` | Pool that mined the tip |
 | Latest block reward / fees | `3.16 BTC` / `0.03 BTC` | Reward = subsidy + fees |
 | Projected blocks | `8` | How many blocks the current mempool would fill |
