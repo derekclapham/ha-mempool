@@ -2,6 +2,17 @@
 
 All notable changes to this integration are documented here.
 
+## [0.4.0] - 2026-08-05
+
+### Fixes
+- Declare the correct Home Assistant minimum version requirement.
+
+### Documentation
+- Refresh README to reflect current project state.
+
+### Internal
+- Validate brands via the inline brand/ folder in CI.
+
 ## [Unreleased]
 
 ### Fixes
