@@ -1,6 +1,22 @@
 # Changelog
 
-All notable changes to Machete are documented here.
+All notable changes to this integration are documented here.
+
+## [0.4.0] - 2026-08-05
+
+### Fixes
+- Declare the correct Home Assistant minimum version requirement.
+
+### Documentation
+- Refresh README to reflect current project state.
+
+### Internal
+- Validate brands via the inline brand/ folder in CI.
+
+## [Unreleased]
+
+### Fixes
+- Declare the real Home Assistant minimum. The sensor platform imports `AddConfigEntryEntitiesCallback`, which only exists from 2025.3.0, but `hacs.json` and the README advertised 2025.1 — so HACS would offer the integration to installs where the sensor platform raises `ImportError` and the config entry fails to set up. Neither CI job catches this: hassfest runs against Home Assistant `master`, and the HACS action does not resolve imports against the declared minimum.
 
 ## [0.3.0] - 2026-08-04
 
