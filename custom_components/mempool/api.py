@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from math import isfinite
 from typing import Any, NoReturn
 
 import aiohttp
@@ -19,6 +20,8 @@ from .const import (
     API_PRICES,
     API_REWARD_STATS,
     API_TIP_HEIGHT,
+    MAX_BLOCK_HEIGHT,
+    MAX_LIST_ITEMS,
 )
 
 # A generous single timeout covers connect + read. A slow/unreachable node
@@ -47,6 +50,21 @@ def _reject_json_constant(value: str) -> NoReturn:
     statistics, where they are neither meaningful nor recoverable.
     """
     raise ValueError(f"unsupported JSON constant {value}")
+
+
+def _strict_float(value: str) -> float:
+    """Parse a JSON number, refusing anything that is not finite.
+
+    Rejecting the bare `Infinity` and `NaN` literals is not sufficient on its
+    own: an ordinary-looking numeric literal that overflows a float, such as
+    `1e400`, also parses to infinity and reaches sensor states the same way.
+    This runs on every float in the body, so both spellings are caught at the
+    point of parsing rather than being chased through the code that uses them.
+    """
+    parsed = float(value)
+    if not isfinite(parsed):
+        raise ValueError(f"non-finite JSON number {value}")
+    return parsed
 
 
 class MempoolClient:
@@ -85,7 +103,11 @@ class MempoolClient:
             raise MempoolApiError(f"Error fetching {path}: {err}") from err
 
         try:
-            return json.loads(text, parse_constant=_reject_json_constant)
+            return json.loads(
+                text,
+                parse_constant=_reject_json_constant,
+                parse_float=_strict_float,
+            )
         except ValueError as err:
             # e.g. an HTML error page from a reverse proxy in front of the node.
             raise MempoolApiError(f"Invalid JSON from {path}: {text[:80]!r}") from err
@@ -108,13 +130,18 @@ class MempoolClient:
         return data
 
     async def _get_list(self, path: str) -> list[dict[str, Any]]:
-        """GET a path that must answer with a JSON array."""
+        """GET a path that must answer with a JSON array.
+
+        Truncated rather than rejected past the cap: the endpoints returning
+        arrays are ordered newest-first, so the entries the sensors read are at
+        the front and an over-long tail is simply discarded.
+        """
         data = await self._get(path)
         if not isinstance(data, list):
             raise MempoolApiError(
                 f"Expected a JSON array from {path}, got {type(data).__name__}"
             )
-        return data
+        return data[:MAX_LIST_ITEMS]
 
     @staticmethod
     async def _read_capped(resp: aiohttp.ClientResponse, path: str) -> str:
@@ -139,8 +166,24 @@ class MempoolClient:
             raise MempoolApiError(f"Non-UTF-8 response from {path}") from err
 
     async def tip_height(self) -> int:
-        """Current chain tip height (endpoint returns a bare integer)."""
-        return int(await self._get(API_TIP_HEIGHT))
+        """Current chain tip height (endpoint returns a bare integer).
+
+        Range-checked here rather than downstream. The height is fed into an
+        exponent when the block subsidy is derived, so an absurd value does not
+        produce a wrong answer -- it produces unbounded work. Rejecting it at
+        ingest fails the poll cleanly, which the coordinator already turns into
+        unavailable sensors and a single log line.
+        """
+        raw = await self._get(API_TIP_HEIGHT)
+        try:
+            height = int(raw)
+        except (TypeError, ValueError, OverflowError) as err:
+            raise MempoolApiError(
+                f"Chain tip height is not an integer: {type(raw).__name__}"
+            ) from err
+        if not 0 <= height <= MAX_BLOCK_HEIGHT:
+            raise MempoolApiError(f"Implausible chain tip height: {height}")
+        return height
 
     async def difficulty_adjustment(self) -> dict[str, Any]:
         """Difficulty adjustment progress / ETA / projected change."""

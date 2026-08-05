@@ -7,6 +7,7 @@ are rich immediately instead of filling in over time.
 
 from __future__ import annotations
 
+from math import isfinite
 from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
@@ -21,6 +22,8 @@ from .const import (
     ATTR_CONFIG_ENTRY_ID,
     CONF_CURRENCY,
     DOMAIN,
+    LOGGER,
+    MAX_STATISTICS_ROWS,
     SERVICE_IMPORT_PRICE_HISTORY,
 )
 
@@ -148,25 +151,37 @@ def _to_hourly_stats(
     """
     by_hour: dict[int, float] = {}
     for p in points or []:
+        if len(by_hour) >= MAX_STATISTICS_ROWS:
+            # Each row becomes a durable statistics record, and the instance
+            # decides how many points it sends. Hourly points for the whole of
+            # Bitcoin's existence is a small fraction of this ceiling.
+            LOGGER.warning(
+                "Historical price feed returned more than %s hourly points; "
+                "importing the first %s",
+                MAX_STATISTICS_ROWS,
+                MAX_STATISTICS_ROWS,
+            )
+            break
         try:
             value = float(p[currency])
             ts = int(p["time"])
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OverflowError):
             continue
-        if value <= 0:
+        if value <= 0 or not isfinite(value):
             continue
         by_hour[(ts // 3600) * 3600] = value  # floor epoch seconds to the hour
 
     stats: list[Any] = []
     for hour in sorted(by_hour):  # HA expects rows in ascending start order
         value = by_hour[hour]
+        try:
+            start = dt_util.utc_from_timestamp(hour)  # tz-aware, hour-aligned
+        except (OSError, OverflowError, ValueError):
+            # An epoch the platform cannot represent. Skip the row rather than
+            # failing an import whose other rows are perfectly good.
+            continue
         stats.append(
-            statistic_data(
-                start=dt_util.utc_from_timestamp(hour),  # tz-aware, hour-aligned
-                mean=value,
-                min=value,
-                max=value,
-            )
+            statistic_data(start=start, mean=value, min=value, max=value)
         )
     return stats
 

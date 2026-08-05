@@ -67,6 +67,40 @@ API_REWARD_STATS = "/api/v1/mining/reward-stats/144"
 HALVING_INTERVAL = 210_000  # blocks between subsidy halvings
 INITIAL_SUBSIDY = 50  # BTC block subsidy before the first halving
 
+# --- limits on what a mempool instance is allowed to send us ------------------
+# Everything the API returns is untrusted: a compromised or impersonated
+# instance, a hijacked DNS record or an intercepting proxy all deliver the same
+# thing, which is attacker-chosen JSON to code running inside the user's home.
+# These bounds are applied where the data enters rather than where it is used,
+# and each sits far above anything a real instance produces.
+
+# The chain tip is fed into an exponent when deriving the block subsidy, so an
+# absurd value is not merely wrong -- it is unbounded work. Bitcoin's final
+# halving lands near height 6.93 million in about 2140, so 100 million is
+# centuries of headroom while still being a bound.
+MAX_BLOCK_HEIGHT = 100_000_000
+
+# Longest list we will accept from an endpoint that returns an array. The
+# blocks endpoint returns ~15 entries and the projected-blocks endpoint under
+# 10; the mining-pool list is bounded by how many pools exist.
+MAX_LIST_ITEMS = 1_000
+
+# Currency codes we will surface, both in the setup dropdown and as price
+# attributes. Real instances publish a few dozen; the attribute case matters
+# most, since each one is written to the state machine and the recorder on
+# every poll.
+MAX_CURRENCIES = 100
+
+# Longest string accepted from the API for a sensor state. Home Assistant
+# refuses a state over 255 characters outright, so a name longer than this is
+# already useless -- truncating keeps the sensor working instead.
+MAX_STRING_LENGTH = 64
+
+# Ceiling on rows a single price-history import may create. Each row is a
+# durable statistics record. Hourly points since Bitcoin's launch is roughly
+# 140,000, so this allows a full history several times over.
+MAX_STATISTICS_ROWS = 500_000
+
 # Service to backfill price history into long-term statistics (see services.py).
 SERVICE_IMPORT_PRICE_HISTORY = "import_price_history"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"

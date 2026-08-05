@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+import re
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -18,7 +19,13 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
-from .const import HALVING_INTERVAL, INITIAL_SUBSIDY
+from .const import (
+    HALVING_INTERVAL,
+    INITIAL_SUBSIDY,
+    MAX_BLOCK_HEIGHT,
+    MAX_CURRENCIES,
+    MAX_STRING_LENGTH,
+)
 from .coordinator import MempoolConfigEntry
 from .entity import MempoolEntity
 
@@ -61,10 +68,46 @@ def _hash(data: dict[str, Any], key: str) -> Any:
     return (data.get("hashrate") or {}).get(key)
 
 
+# Characters that must never reach a sensor state or a log line. Control and
+# format characters carry terminal escape sequences that rewrite the screen of
+# anyone tailing the log, newlines that forge log entries, and bidirectional
+# overrides that make a name display as something other than what it is.
+_UNSAFE_CHARS = re.compile(
+    r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]"
+)
+
+
+def _clean(value: Any) -> StateType:
+    """Make an API-supplied string safe to use as a sensor state.
+
+    Mining pool names are chosen by whoever runs the instance, not by the user,
+    so they are sanitised and length-capped before being surfaced. Home
+    Assistant rejects a state over 255 characters outright, which would take
+    the sensor out entirely; truncating keeps it working.
+    """
+    if not isinstance(value, str):
+        return None
+    text = _UNSAFE_CHARS.sub("", value).strip()
+    return text[:MAX_STRING_LENGTH] or None
+
+
+def _timestamp(seconds: float) -> datetime | None:
+    """Epoch seconds to a tz-aware datetime, or None if out of range.
+
+    An out-of-range epoch raises rather than returning something wrong, and
+    this runs inside a state write, so it is caught here and reported as no
+    value instead of failing the whole platform update.
+    """
+    try:
+        return dt_util.utc_from_timestamp(seconds)
+    except (OSError, OverflowError, ValueError):
+        return None
+
+
 def _retarget(data: dict[str, Any]) -> datetime | None:
     """Convert the retarget epoch (ms) into a tz-aware datetime for HA."""
     ms = _num(_diff(data, "estimatedRetargetDate"))
-    return dt_util.utc_from_timestamp(ms / 1000) if ms else None
+    return _timestamp(ms / 1000) if ms else None
 
 
 def _scaled(value: Any, factor: float) -> float | None:
@@ -88,24 +131,38 @@ def _block_extra(data: dict[str, Any], key: str) -> Any:
 def _block_time(data: dict[str, Any]) -> datetime | None:
     """Tip block's timestamp as a tz-aware datetime (renders as 'x ago')."""
     ts = _num(_block(data, "timestamp"))
-    return dt_util.utc_from_timestamp(ts) if ts else None
+    return _timestamp(ts) if ts else None
 
 
 def _block_pool(data: dict[str, Any]) -> StateType:
     """Name of the pool that mined the tip block."""
-    return (_block_extra(data, "pool") or {}).get("name")
+    return _clean((_block_extra(data, "pool") or {}).get("name"))
+
+
+def _plausible_height(height: Any) -> int | None:
+    """Coerce a chain tip height, or None if it is not a believable one.
+
+    The client already range-checks the height on ingest. This repeats the
+    check because the cost of being wrong is asymmetric: the value is used as
+    an exponent below, where an absurd height is not a wrong number but an
+    allocation large enough to hang Home Assistant's event loop outright.
+    """
+    h = _num(height)
+    if h is None or not 0 < h <= MAX_BLOCK_HEIGHT:
+        return None
+    return int(h)
 
 
 def _subsidy(height: Any) -> float | None:
     """Current block subsidy in BTC, halving every 210k blocks."""
-    h = _num(height)
-    return INITIAL_SUBSIDY / (2 ** (int(h) // HALVING_INTERVAL)) if h else None
+    h = _plausible_height(height)
+    return INITIAL_SUBSIDY / (2 ** (h // HALVING_INTERVAL)) if h else None
 
 
 def _blocks_to_halving(height: Any) -> int | None:
     """Blocks remaining until the next subsidy halving."""
-    h = _num(height)
-    return HALVING_INTERVAL - (int(h) % HALVING_INTERVAL) if h else None
+    h = _plausible_height(height)
+    return HALVING_INTERVAL - (h % HALVING_INTERVAL) if h else None
 
 
 def _next_halving_time(data: dict[str, Any]) -> datetime | None:
@@ -115,12 +172,12 @@ def _next_halving_time(data: dict[str, Any]) -> datetime | None:
     Bitcoin's 10-minute (600 s) target — so it stays stable between blocks
     rather than drifting every poll, and only nudges when a new block lands.
     """
-    height = _num(data.get("height"))
+    height = _plausible_height(data.get("height"))
     anchor = _num(_block(data, "timestamp"))
     if height is None or anchor is None:
         return None
-    blocks_left = HALVING_INTERVAL - (int(height) % HALVING_INTERVAL)
-    return dt_util.utc_from_timestamp(anchor + blocks_left * 600)
+    blocks_left = HALVING_INTERVAL - (height % HALVING_INTERVAL)
+    return _timestamp(anchor + blocks_left * 600)
 
 
 def _projected(data: dict[str, Any], index: int, key: str) -> Any:
@@ -510,7 +567,9 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         translation_key="top_pool",
         suggested_display_precision=None,  # string
         group="slow",
-        value_fn=lambda d, _c: (_pools(d)[0].get("name") if _pools(d) else None),
+        value_fn=lambda d, _c: (
+            _clean(_pools(d)[0].get("name")) if _pools(d) else None
+        ),
     ),
     MempoolSensorDescription(
         key="top_pool_share",
@@ -653,11 +712,16 @@ class MempoolSensor(MempoolEntity, SensorEntity):
         if not self._expose_currencies:
             return None
         prices = (self.coordinator.data or {}).get("prices") or {}
-        return {
-            code: value
+        codes = sorted(
+            code
             for code, value in prices.items()
             if code.isalpha()
             and len(code) == 3
             and code.isupper()
             and code != self._currency
-        }
+            and isinstance(value, (int, float))
+        )
+        # Bounded because every attribute is written to the state machine and
+        # the recorder on each poll, and the instance chooses how many there
+        # are. Real instances publish a few dozen.
+        return {code: prices[code] for code in codes[:MAX_CURRENCIES]}
