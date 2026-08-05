@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 import voluptuous as vol
 
 from homeassistant.config_entries import (
+    ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -42,6 +44,18 @@ from .const import (
 )
 
 
+def _is_valid_base_url(base_url: str) -> bool:
+    """True if the value is an absolute http(s) URL with a host.
+
+    The base URL is free-text and every request the integration makes is built
+    from it, so reject anything that is not an addressable http(s) endpoint
+    before we hand it to the client. Which host is allowed is deliberately not
+    restricted: pointing at a node on the local network is the normal case.
+    """
+    parsed = urlparse(base_url)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
 def _make_client(hass: HomeAssistant, base_url: str, verify_ssl: bool) -> MempoolClient:
     """Build a client on HA's shared session honouring the SSL choice."""
     return MempoolClient(async_get_clientsession(hass, verify_ssl=verify_ssl), base_url)
@@ -52,12 +66,13 @@ async def _probe_currencies(client: MempoolClient) -> list[str]:
 
     The prices payload also carries a non-currency "time" key, so keep only
     3-letter uppercase ISO codes (USD, AUD, ...) with a positive value.
+
+    A payload that is not a JSON object raises MempoolApiError from the client
+    rather than reaching here, so it is caught alongside a dead endpoint.
     """
     try:
         prices = await client.prices()
     except MempoolApiError:
-        return []
-    if not isinstance(prices, dict):
         return []
     return sorted(
         k
@@ -74,12 +89,18 @@ def _fast_interval_selector() -> NumberSelector:
     """Slider/box for the fast poll interval (seconds)."""
     return NumberSelector(
         NumberSelectorConfig(
-            min=15, max=3600, step=5, unit_of_measurement="s", mode=NumberSelectorMode.BOX
+            min=15,
+            max=3600,
+            step=5,
+            unit_of_measurement="s",
+            mode=NumberSelectorMode.BOX,
         )
     )
 
 
-def _currency_default(hass: HomeAssistant, currencies: list[str], current: str | None) -> str:
+def _currency_default(
+    hass: HomeAssistant, currencies: list[str], current: str | None
+) -> str:
     """Pick a sensible default currency for the dropdown."""
     for candidate in (current, hass.config.currency, "USD"):
         if candidate in currencies:
@@ -126,20 +147,26 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            base_url = user_input[CONF_BASE_URL].rstrip("/")
+            base_url = user_input[CONF_BASE_URL].strip().rstrip("/")
             verify_ssl = user_input[CONF_VERIFY_SSL]
-            # The base URL is the unique ID, so the same instance can't be
-            # added twice (and a re-add updates rather than duplicates).
-            await self.async_set_unique_id(base_url)
-            self._abort_if_unique_id_configured()
-
-            client = _make_client(self.hass, base_url, verify_ssl)
-            if not await self._validate(client):
-                errors["base"] = "cannot_connect"
+            if not _is_valid_base_url(base_url):
+                errors["base"] = "invalid_url"
             else:
-                return await self._finish_setup(
-                    base_url, verify_ssl, int(user_input[CONF_FAST_INTERVAL]), client
-                )
+                # The base URL is the unique ID, so the same instance can't be
+                # added twice (and a re-add updates rather than duplicates).
+                await self.async_set_unique_id(base_url)
+                self._abort_if_unique_id_configured()
+
+                client = _make_client(self.hass, base_url, verify_ssl)
+                if not await self._validate(client):
+                    errors["base"] = "cannot_connect"
+                else:
+                    return await self._finish_setup(
+                        base_url,
+                        verify_ssl,
+                        int(user_input[CONF_FAST_INTERVAL]),
+                        client,
+                    )
 
         schema = vol.Schema(
             {
@@ -156,6 +183,81 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(
             step_id="self_hosted", data_schema=schema, errors=errors
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Point an existing entry at a moved or corrected instance URL.
+
+        Distinct from the options flow, which tunes how the instance is polled.
+        This changes *which* endpoint the entry talks to — the case where a node
+        has moved to a new address and the alternative would be removing and
+        re-adding the entry, losing every entity's recorded history with it.
+
+        Entity unique IDs are derived from the config entry ID, not the URL, so
+        history follows the entry across the change.
+        """
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            base_url = user_input[CONF_BASE_URL].strip().rstrip("/")
+            verify_ssl = user_input[CONF_VERIFY_SSL]
+            if not _is_valid_base_url(base_url):
+                errors["base"] = "invalid_url"
+            elif any(
+                other.unique_id == base_url and other.entry_id != entry.entry_id
+                for other in self._async_current_entries()
+            ):
+                # Another entry already owns this instance. Aborting beats
+                # silently ending up with two entries for one instance.
+                return self.async_abort(reason="already_configured")
+            else:
+                client = _make_client(self.hass, base_url, verify_ssl)
+                if not await self._validate(client):
+                    errors["base"] = "cannot_connect"
+                else:
+                    interval = int(user_input[CONF_FAST_INTERVAL])
+                    # Reconfiguring onto the public instance must not smuggle
+                    # in a faster poll than that branch normally allows.
+                    if base_url == MEMPOOL_SPACE_URL:
+                        interval = PUBLIC_FAST_INTERVAL
+                    host = base_url.split("//")[-1]
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        unique_id=base_url,
+                        title=f"{DEFAULT_NAME} ({host})",
+                        data_updates={
+                            CONF_BASE_URL: base_url,
+                            CONF_VERIFY_SSL: verify_ssl,
+                            CONF_FAST_INTERVAL: interval,
+                        },
+                    )
+
+        # Pre-fill with what the entry uses now (options win over data).
+        current_verify = entry.options.get(
+            CONF_VERIFY_SSL, entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
+        )
+        current_interval = entry.options.get(
+            CONF_FAST_INTERVAL,
+            entry.data.get(CONF_FAST_INTERVAL, DEFAULT_FAST_INTERVAL),
+        )
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_BASE_URL, default=entry.data[CONF_BASE_URL]
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.URL)),
+                vol.Required(
+                    CONF_VERIFY_SSL, default=current_verify
+                ): BooleanSelector(),
+                vol.Required(
+                    CONF_FAST_INTERVAL, default=current_interval
+                ): _fast_interval_selector(),
+            }
+        )
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=schema, errors=errors
         )
 
     async def _validate(self, client: MempoolClient) -> bool:
@@ -216,11 +318,13 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
     def _create(self) -> ConfigFlowResult:
         """Create the entry with a title derived from the host."""
         host = self._data[CONF_BASE_URL].split("//")[-1]
-        return self.async_create_entry(title=f"{DEFAULT_NAME} ({host})", data=self._data)
+        return self.async_create_entry(
+            title=f"{DEFAULT_NAME} ({host})", data=self._data
+        )
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry) -> MempoolOptionsFlow:
+    def async_get_options_flow(config_entry: ConfigEntry) -> MempoolOptionsFlow:
         """Return the options flow handler."""
         return MempoolOptionsFlow()
 

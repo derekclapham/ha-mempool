@@ -1,0 +1,114 @@
+{
+  "entity": {
+    "sensor": {
+      "block_height": {
+        "default": "mdi:cube-outline"
+      },
+      "fee_fastest": {
+        "default": "mdi:rocket-launch-outline"
+      },
+      "fee_half_hour": {
+        "default": "mdi:clock-fast"
+      },
+      "fee_hour": {
+        "default": "mdi:clock-outline"
+      },
+      "fee_economy": {
+        "default": "mdi:cash-minus"
+      },
+      "fee_minimum": {
+        "default": "mdi:cash-remove"
+      },
+      "mempool_transactions": {
+        "default": "mdi:file-tree-outline"
+      },
+      "mempool_size": {
+        "default": "mdi:database-outline"
+      },
+      "mempool_total_fees": {
+        "default": "mdi:cash-multiple"
+      },
+      "latest_block_time": {
+        "default": "mdi:cube"
+      },
+      "latest_block_transactions": {
+        "default": "mdi:swap-horizontal"
+      },
+      "latest_block_size": {
+        "default": "mdi:database"
+      },
+      "latest_block_weight": {
+        "default": "mdi:weight"
+      },
+      "latest_block_miner": {
+        "default": "mdi:pickaxe"
+      },
+      "latest_block_reward": {
+        "default": "mdi:cash-plus"
+      },
+      "latest_block_fees": {
+        "default": "mdi:cash"
+      },
+      "latest_block_median_fee": {
+        "default": "mdi:cash-clock"
+      },
+      "projected_blocks": {
+        "default": "mdi:layers-triple"
+      },
+      "next_block_fee": {
+        "default": "mdi:cube-send"
+      },
+      "blocks_to_halving": {
+        "default": "mdi:sync"
+      },
+      "block_subsidy": {
+        "default": "mdi:bitcoin"
+      },
+      "next_halving": {
+        "default": "mdi:calendar-star"
+      },
+      "blocks_per_hour": {
+        "default": "mdi:timer-sand"
+      },
+      "network_pace": {
+        "default": "mdi:speedometer"
+      },
+      "difficulty_progress": {
+        "default": "mdi:progress-clock"
+      },
+      "difficulty_change": {
+        "default": "mdi:swap-vertical-bold"
+      },
+      "blocks_to_retarget": {
+        "default": "mdi:cube-scan"
+      },
+      "next_retarget": {
+        "default": "mdi:calendar-clock"
+      },
+      "hashrate": {
+        "default": "mdi:speedometer"
+      },
+      "difficulty": {
+        "default": "mdi:chart-line-variant"
+      },
+      "top_pool": {
+        "default": "mdi:account-hard-hat"
+      },
+      "top_pool_share": {
+        "default": "mdi:chart-pie"
+      },
+      "mining_reward_24h": {
+        "default": "mdi:cash-plus"
+      },
+      "mining_fees_24h": {
+        "default": "mdi:cash"
+      },
+      "mean_tx_fee_24h": {
+        "default": "mdi:cash-clock"
+      },
+      "price": {
+        "default": "mdi:bitcoin"
+      }
+    }
+  }
+}

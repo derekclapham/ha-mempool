@@ -31,16 +31,33 @@
           "price_attributes": "Expose other currencies as attributes"
         },
         "data_description": {
+          "currency": "Only the fiats your instance actually publishes are listed. This choice sets the price sensor's unit and its long-term statistics.",
           "price_attributes": "Optionally attach every other fiat your instance serves to the price sensor as attributes, for templating. These are not recorded as long-term statistics."
+        }
+      },
+      "reconfigure": {
+        "title": "Change instance URL",
+        "description": "Point this entry at a different address for your mempool instance. Your existing sensors and their history are kept.",
+        "data": {
+          "base_url": "Base URL",
+          "verify_ssl": "Verify SSL certificate",
+          "fast_interval": "Fast poll interval (seconds)"
+        },
+        "data_description": {
+          "base_url": "The new base URL, including the scheme, host and port. Use this when your instance has moved rather than removing and re-adding it.",
+          "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
+          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool). Forced to 300 s if you point this entry at the public mempool.space."
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API."
+      "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API.",
+      "invalid_url": "That does not look like an address. Enter the full base URL of your mempool instance, including the scheme, host and port."
     },
     "abort": {
       "already_configured": "This mempool instance is already configured.",
-      "cannot_connect": "Could not reach mempool.space right now. Please try again."
+      "cannot_connect": "Could not reach mempool.space right now. Please try again.",
+      "reconfigure_successful": "The mempool instance URL was updated."
     }
   },
   "options": {
@@ -64,42 +81,114 @@
   },
   "entity": {
     "sensor": {
-      "block_height": { "name": "Block height" },
-      "fee_fastest": { "name": "Fee (fastest)" },
-      "fee_half_hour": { "name": "Fee (30 min)" },
-      "fee_hour": { "name": "Fee (1 hour)" },
-      "fee_economy": { "name": "Fee (economy)" },
-      "fee_minimum": { "name": "Fee (minimum)" },
-      "mempool_transactions": { "name": "Mempool transactions" },
-      "mempool_size": { "name": "Mempool size" },
-      "mempool_total_fees": { "name": "Mempool total fees" },
-      "difficulty_progress": { "name": "Difficulty adjustment progress" },
-      "difficulty_change": { "name": "Estimated difficulty change" },
-      "blocks_to_retarget": { "name": "Blocks to retarget" },
-      "next_retarget": { "name": "Next difficulty retarget" },
-      "hashrate": { "name": "Network hashrate" },
-      "difficulty": { "name": "Network difficulty" },
-      "latest_block_time": { "name": "Latest block" },
-      "latest_block_transactions": { "name": "Latest block transactions" },
-      "latest_block_size": { "name": "Latest block size" },
-      "latest_block_weight": { "name": "Latest block weight" },
-      "latest_block_miner": { "name": "Latest block miner" },
-      "latest_block_reward": { "name": "Latest block reward" },
-      "latest_block_fees": { "name": "Latest block fees" },
-      "latest_block_median_fee": { "name": "Latest block median fee" },
-      "projected_blocks": { "name": "Projected blocks" },
-      "next_block_fee": { "name": "Next block fee" },
-      "blocks_to_halving": { "name": "Blocks to halving" },
-      "block_subsidy": { "name": "Block subsidy" },
-      "next_halving": { "name": "Next halving" },
-      "blocks_per_hour": { "name": "Blocks per hour" },
-      "network_pace": { "name": "Network pace" },
-      "top_pool": { "name": "Top mining pool" },
-      "top_pool_share": { "name": "Top pool share" },
-      "mining_reward_24h": { "name": "Mining reward (24h)" },
-      "mining_fees_24h": { "name": "Mining fees (24h)" },
-      "mean_tx_fee_24h": { "name": "Mean transaction fee (24h)" },
-      "price": { "name": "BTC price" }
+      "block_height": {
+        "name": "Block height"
+      },
+      "fee_fastest": {
+        "name": "Fee (fastest)"
+      },
+      "fee_half_hour": {
+        "name": "Fee (30 min)"
+      },
+      "fee_hour": {
+        "name": "Fee (1 hour)"
+      },
+      "fee_economy": {
+        "name": "Fee (economy)"
+      },
+      "fee_minimum": {
+        "name": "Fee (minimum)"
+      },
+      "mempool_transactions": {
+        "name": "Mempool transactions"
+      },
+      "mempool_size": {
+        "name": "Mempool size"
+      },
+      "mempool_total_fees": {
+        "name": "Mempool total fees"
+      },
+      "difficulty_progress": {
+        "name": "Difficulty adjustment progress"
+      },
+      "difficulty_change": {
+        "name": "Estimated difficulty change"
+      },
+      "blocks_to_retarget": {
+        "name": "Blocks to retarget"
+      },
+      "next_retarget": {
+        "name": "Next difficulty retarget"
+      },
+      "hashrate": {
+        "name": "Network hashrate"
+      },
+      "difficulty": {
+        "name": "Network difficulty"
+      },
+      "latest_block_time": {
+        "name": "Latest block"
+      },
+      "latest_block_transactions": {
+        "name": "Latest block transactions"
+      },
+      "latest_block_size": {
+        "name": "Latest block size"
+      },
+      "latest_block_weight": {
+        "name": "Latest block weight"
+      },
+      "latest_block_miner": {
+        "name": "Latest block miner"
+      },
+      "latest_block_reward": {
+        "name": "Latest block reward"
+      },
+      "latest_block_fees": {
+        "name": "Latest block fees"
+      },
+      "latest_block_median_fee": {
+        "name": "Latest block median fee"
+      },
+      "projected_blocks": {
+        "name": "Projected blocks"
+      },
+      "next_block_fee": {
+        "name": "Next block fee"
+      },
+      "blocks_to_halving": {
+        "name": "Blocks to halving"
+      },
+      "block_subsidy": {
+        "name": "Block subsidy"
+      },
+      "next_halving": {
+        "name": "Next halving"
+      },
+      "blocks_per_hour": {
+        "name": "Blocks per hour"
+      },
+      "network_pace": {
+        "name": "Network pace"
+      },
+      "top_pool": {
+        "name": "Top mining pool"
+      },
+      "top_pool_share": {
+        "name": "Top pool share"
+      },
+      "mining_reward_24h": {
+        "name": "Mining reward (24h)"
+      },
+      "mining_fees_24h": {
+        "name": "Mining fees (24h)"
+      },
+      "mean_tx_fee_24h": {
+        "name": "Mean transaction fee (24h)"
+      },
+      "price": {
+        "name": "BTC price"
+      }
     }
   },
   "services": {
@@ -112,6 +201,32 @@
           "description": "The mempool instance whose price history should be imported."
         }
       }
+    }
+  },
+  "exceptions": {
+    "entry_not_found": {
+      "message": "No mempool instance found with ID {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "That mempool instance is not loaded. Check it is reachable, then try again."
+    },
+    "no_currency": {
+      "message": "That mempool instance has no price currency configured, so there is no price history to import."
+    },
+    "price_sensor_missing": {
+      "message": "No price sensor exists for that mempool instance. Its price feed is probably switched off."
+    },
+    "historical_fetch_failed": {
+      "message": "Could not fetch the historical price feed: {error}"
+    },
+    "no_usable_history": {
+      "message": "The historical price feed returned no usable data."
+    }
+  },
+  "issues": {
+    "price_feed_unavailable": {
+      "title": "Bitcoin price feed unavailable",
+      "description": "{title} is set to report the Bitcoin price in {currency}, but its price feed is not returning that currency, so the price sensor has not been created.\n\nmempool instances only serve prices when the price feed is enabled. Switch it on in your instance's configuration and restart it, then reload this entry. If you would rather not run the price feed, reconfigure the entry and the price sensor will stay absent without this warning."
     }
   }
 }

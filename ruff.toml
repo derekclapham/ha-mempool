@@ -1,0 +1,13 @@
+# Home Assistant's lint conventions, not ruff's defaults. The two disagree on
+# import ordering, so running plain `ruff` would make this code less
+# conformant with core, not more.
+line-length = 88
+
+[lint]
+select = ["F", "E", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[lint.isort]
+force-sort-within-sections = true
+known-first-party = ["homeassistant"]
+combine-as-imports = true
+split-on-trailing-comma = false
