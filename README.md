@@ -61,7 +61,13 @@ Each config entry creates one device with the sensors below. All numeric sensors
 | Mining fees (24h) | `3.9 BTC` | Total fees over the last ~144 blocks |
 | Mean transaction fee (24h) | `615 sat` | Average fee per transaction over ~144 blocks |
 
-Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode_local_8999_block_height`.
+Seven of these ship **switched off** — Latest block weight, Latest block median
+fee, Projected blocks, Network pace, Top pool share, Mining fees (24h) and Mean
+transaction fee (24h). Each either restates a value another sensor already
+shows, uses an obscure unit, or breaks down a figure that is more useful in
+summary. Enable any of them from the entity's settings.
+
+Entities are named `sensor.mempool_<host>_<sensor>`, e.g. `sensor.mempool_mynode_example_8999_block_height`.
 
 ## Installation
 
@@ -82,7 +88,7 @@ Copy `custom_components/mempool` into your Home Assistant `config/custom_compone
 At setup, choose your instance:
 
 - **mempool.space (public)** — no URL needed. Uses `https://mempool.space` and a fixed, gentle **5-minute** poll to respect the shared public API. The interval and SSL settings are locked.
-- **Self-hosted instance** — enter your **base URL** (e.g. `http://mynode.local:8999`), optionally turn off **Verify SSL certificate** for a self-signed cert, and set the **fast poll interval**.
+- **Self-hosted instance** — enter your **base URL** (e.g. `http://mynode.example:8999`), optionally turn off **Verify SSL certificate** for a self-signed cert, and set the **fast poll interval**.
 
 Either way, the URL is verified (via `/api/v1/difficulty-adjustment`, proving it's really a mempool API), then — if a price feed is present — you pick which currency to report (only the fiats the instance actually serves).
 
@@ -137,7 +143,7 @@ graph_span: 6y
 span:
   end: day
 series:
-  - entity: sensor.mempool_mynode_local_8999_btc_price
+  - entity: sensor.mempool_mynode_example_8999_btc_price
     type: area
     statistics:
       type: mean
@@ -159,7 +165,13 @@ series:
 
 - Listing in the **HACS default store**, so it installs without adding a custom repository (in progress).
 - HTTP basic auth for protected instances.
-- Automated tests and a diagnostics download.
+
+## Documentation
+
+The full integration documentation, written in the format
+[home-assistant.io](https://github.com/home-assistant/home-assistant.io) expects,
+is staged in [`docs/`](docs/). See [docs/README.md](docs/README.md) for why it
+lives there rather than being published.
 
 ## Disclaimer
 
