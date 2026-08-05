@@ -1,0 +1,52 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "30 4 * * *"
+
+# The suite only ever reads the checkout. Stated explicitly rather than relying
+# on the repository's default token permission, which an org or repo setting
+# could widen later without anyone revisiting this file.
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Must track what Home Assistant itself requires: 2026.8 declares
+          # requires-python >=3.14.2, so 3.13 fails at install time.
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # pytest-homeassistant-custom-component pins the Home Assistant it
+          # tests against, so it is the single source of the HA version here.
+          pip install pytest-homeassistant-custom-component pytest-cov ruff
+
+      - name: Lint
+        # Home Assistant's own conventions, not ruff's defaults; the two
+        # disagree on import ordering.
+        run: ruff check --config ruff.toml custom_components tests conftest.py
+
+      - name: Test
+        run: |
+          pytest --cov=custom_components.mempool \
+                 --cov-report=term-missing \
+                 --cov-fail-under=95
+
+      - name: Check strings.json and translations/en.json are identical
+        # Kept as a separate step so a mismatch reads as its own failure: an
+        # entity whose translation is missing silently loses its name.
+        run: |
+          cmp custom_components/mempool/strings.json \
+              custom_components/mempool/translations/en.json
