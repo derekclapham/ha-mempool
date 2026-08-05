@@ -200,20 +200,29 @@ class MempoolSensorDescription(SensorEntityDescription):
 # rounds the UI — the recorded state keeps full precision for statistics.
 #
 # On entity categories: none of these carry one, deliberately. EntityCategory
-# classifies entities that describe the *device's own* configuration or health
-# rather than what it is for. Reporting chain and mempool state is precisely
-# what a mempool instance is for, so every sensor here is a primary entity and
-# the default (no category) is correct. If a sensor is ever added that
-# describes the instance itself — its sync status, say, or its database size —
-# that one is DIAGNOSTIC.
+# classifies entities that describe the *device or service itself* rather than
+# what it reports. Core's nearest analogue is nordpool, which marks exactly
+# three sensors DIAGNOSTIC — updated_at, currency and exchange_rate, all
+# properties of the feed — while every actual price sensor is left uncategorised.
+# Every sensor here is chain or mempool state, which is what a mempool instance
+# exists to report, so all of them are primary. A sensor describing the instance
+# itself — its sync status, database size or last successful poll — would be
+# DIAGNOSTIC; there is not one yet.
 #
 # On device classes: Home Assistant's device classes cover physical quantities
 # and none of them fit sat/vB, virtual bytes, hashrate, difficulty or a block
 # subsidy. The exceptions are the three timestamps (TIMESTAMP) and block size
-# (DATA_SIZE), which are tagged. The price sensor is deliberately left untagged
-# — MONETARY requires state_class TOTAL, and this is a spot price recorded as
-# MEASUREMENT, so tagging it would mean changing the statistics semantics of a
-# sensor that already has history.
+# (DATA_SIZE), which are tagged.
+#
+# The price sensor is deliberately left untagged, and MONETARY would be wrong
+# rather than merely inconvenient. MONETARY permits only state_class TOTAL, and
+# TOTAL makes the recorder keep `sum` statistics where MEASUREMENT keeps
+# mean/min/max. A spot price is an instantaneous reading, not a running total:
+# summing it produces a meaningless number and turns the long-term price chart
+# into a cumulative ramp. It would also contradict import_price_history, which
+# backfills the same series with has_mean=True, has_sum=False. Core models this
+# the same way — nordpool's electricity price sensors carry state_class
+# MEASUREMENT and no device class, reserving TIMESTAMP for its timestamps.
 SENSORS: tuple[MempoolSensorDescription, ...] = (
     # ---- fast group (chain tip, fees, mempool) ----
     MempoolSensorDescription(
@@ -363,7 +372,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_median_fee",
         translation_key="latest_block_median_fee",
-        # Off by default: the five fee-tier sensors already cover fee levels.
+        # Off by default: a retrospective restatement of fee levels the five
+        # forward-looking fee-tier sensors already cover.
         entity_registry_enabled_default=False,
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
@@ -375,7 +385,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="projected_blocks",
         translation_key="projected_blocks",
-        # Off by default: changes on nearly every poll and is of niche interest.
+        # Off by default: recomputed on every poll, so the noisiest sensor here,
+        # and of narrow interest.
         entity_registry_enabled_default=False,
         native_unit_of_measurement="blocks",
         state_class=SensorStateClass.MEASUREMENT,
@@ -404,8 +415,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="block_subsidy",
         translation_key="block_subsidy",
-        # Off by default: derivable from block height and changes once every four years.
-        entity_registry_enabled_default=False,
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=3,
@@ -432,7 +441,7 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="network_pace",
         translation_key="network_pace",
-        # Off by default: a restatement of blocks_per_hour as a percentage.
+        # Off by default: arithmetic restatement of blocks_per_hour.
         entity_registry_enabled_default=False,
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
@@ -506,7 +515,7 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="top_pool_share",
         translation_key="top_pool_share",
-        # Off by default: niche; top_pool names the pool, which is the interesting part.
+        # Off by default: granular breakdown; top_pool carries the headline.
         entity_registry_enabled_default=False,
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
@@ -518,8 +527,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mining_reward_24h",
         translation_key="mining_reward_24h",
-        # Off by default: mining statistic, of interest to few users.
-        entity_registry_enabled_default=False,
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -530,7 +537,7 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mining_fees_24h",
         translation_key="mining_fees_24h",
-        # Off by default: mining statistic, of interest to few users.
+        # Off by default: granular breakdown; mining_reward_24h is the headline.
         entity_registry_enabled_default=False,
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
@@ -541,7 +548,7 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mean_tx_fee_24h",
         translation_key="mean_tx_fee_24h",
-        # Off by default: mining statistic, of interest to few users.
+        # Off by default: granular breakdown; mining_reward_24h is the headline.
         entity_registry_enabled_default=False,
         native_unit_of_measurement="sat",
         state_class=SensorStateClass.MEASUREMENT,

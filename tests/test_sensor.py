@@ -435,17 +435,21 @@ async def test_unavailable_and_unknown_are_distinct(
     )
 
 
-# Sensors that ship switched off: secondary or restated values that most users
-# will not want recorded. Listed explicitly so the choice is reviewable and
-# cannot drift silently -- this only takes effect at first registration, so it
-# is invisible in normal use and would otherwise never be noticed if it changed.
+# Sensors that ship switched off. One principle: keep the headline of each
+# group, and disable restatements, obscure units and granular breakdowns.
+# Everything here is either noisy (recomputed every poll) or narrow, and none
+# of it is the only way to see something.
+#
+# Note what is deliberately NOT here. block_subsidy changes once every four
+# years, so disabling it would save no recorder work at all while hiding a
+# headline Bitcoin figure; and mining_reward_24h is the headline its two
+# granular siblings break down. Listed explicitly because this only takes
+# effect at first registration, making it invisible in ordinary use.
 DISABLED_BY_DEFAULT = {
-    "block_subsidy",
     "latest_block_median_fee",
     "latest_block_weight",
     "mean_tx_fee_24h",
     "mining_fees_24h",
-    "mining_reward_24h",
     "network_pace",
     "projected_blocks",
     "top_pool_share",
