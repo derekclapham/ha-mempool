@@ -393,3 +393,83 @@ async def test_currency_default_falls_back_to_first_offered(
     key = next(k for k in result["data_schema"].schema if str(k) == CONF_CURRENCY)
     assert result["data_schema"].schema[key].config["options"] == ["AUD", "CAD"]
     assert key.default() == "AUD"
+
+
+@pytest.mark.parametrize(
+    "bad_url",
+    [
+        "not-a-url",
+        "mynode.example:8999",  # scheme omitted — a realistic typo
+        "ftp://mynode.example",
+        "file:///etc/passwd",
+        "http://",  # scheme but no host
+        "",
+    ],
+)
+async def test_self_hosted_rejects_non_http_urls(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, bad_url: str
+) -> None:
+    """Every request is built from this value, so it must be an http(s) URL.
+
+    Rejected in the flow rather than surfacing as a confusing connection
+    error, and without any request being attempted.
+    """
+    menu = await _start_menu(hass)
+    result = await _pick(hass, menu["flow_id"], "self_hosted")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: bad_url, CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 60},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_url"}
+    assert aioclient_mock.call_count == 0
+
+
+async def test_invalid_url_then_recovers(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_setup_entry: AsyncMock,
+) -> None:
+    """The user can correct a malformed URL and finish the flow."""
+    menu = await _start_menu(hass)
+    result = await _pick(hass, menu["flow_id"], "self_hosted")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: "mempool.test", CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 60},
+    )
+    assert result["errors"] == {"base": "invalid_url"}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: BASE_URL, CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 60},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_CURRENCY: "USD", CONF_PRICE_ATTRIBUTES: False}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_surrounding_whitespace_is_trimmed(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_setup_entry: AsyncMock,
+) -> None:
+    """A pasted URL with stray whitespace still resolves to the same entry."""
+    menu = await _start_menu(hass)
+    result = await _pick(hass, menu["flow_id"], "self_hosted")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_BASE_URL: f"  {BASE_URL}/  ",
+            CONF_VERIFY_SSL: True,
+            CONF_FAST_INTERVAL: 60,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_CURRENCY: "USD", CONF_PRICE_ATTRIBUTES: False}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_BASE_URL] == BASE_URL

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, NoReturn
 
 import aiohttp
 
@@ -25,9 +25,28 @@ from .const import (
 # surfaces as MempoolApiError, which the coordinators turn into UpdateFailed.
 _TIMEOUT = aiohttp.ClientTimeout(total=15)
 
+# Cap on the *decompressed* body we will hold in memory. aiohttp transparently
+# inflates gzip, so without this a small compressed reply from a hostile or
+# misconfigured host could expand to hundreds of megabytes before we ever
+# reach the parser. The largest endpoint by a wide margin is historical-price:
+# measured at ~1 MB on the public instance, growing by roughly 65 KB a year as
+# the series lengthens. 16 MiB leaves decades of headroom.
+_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+_CHUNK_BYTES = 64 * 1024
+
 
 class MempoolApiError(Exception):
     """Raised when the mempool API cannot be reached or returns junk."""
+
+
+def _reject_json_constant(value: str) -> NoReturn:
+    """Refuse the bare literals `json.loads` accepts outside strict JSON.
+
+    By default `json.loads` parses `NaN`, `Infinity` and `-Infinity` into
+    floats. Those would flow straight into sensor states and long-term
+    statistics, where they are neither meaningful nor recoverable.
+    """
+    raise ValueError(f"unsupported JSON constant {value}")
 
 
 class MempoolClient:
@@ -61,15 +80,37 @@ class MempoolClient:
                 url, params=params, timeout=_TIMEOUT
             ) as resp:
                 resp.raise_for_status()
-                text = (await resp.text()).strip()
+                text = (await self._read_capped(resp, path)).strip()
         except (aiohttp.ClientError, TimeoutError) as err:
             raise MempoolApiError(f"Error fetching {path}: {err}") from err
 
         try:
-            return json.loads(text)
+            return json.loads(text, parse_constant=_reject_json_constant)
         except ValueError as err:
             # e.g. an HTML error page from a reverse proxy in front of the node.
             raise MempoolApiError(f"Invalid JSON from {path}: {text[:80]!r}") from err
+
+    @staticmethod
+    async def _read_capped(resp: aiohttp.ClientResponse, path: str) -> str:
+        """Read a response body, refusing to buffer more than the cap.
+
+        Read in chunks rather than via `resp.text()` so an oversized body is
+        abandoned partway instead of being fully materialised first.
+        """
+        chunks: list[bytes] = []
+        total = 0
+        async for chunk in resp.content.iter_chunked(_CHUNK_BYTES):
+            total += len(chunk)
+            if total > _MAX_RESPONSE_BYTES:
+                raise MempoolApiError(
+                    f"Response from {path} exceeded {_MAX_RESPONSE_BYTES} bytes"
+                )
+            chunks.append(chunk)
+
+        try:
+            return b"".join(chunks).decode("utf-8")
+        except UnicodeDecodeError as err:
+            raise MempoolApiError(f"Non-UTF-8 response from {path}") from err
 
     async def tip_height(self) -> int:
         """Current chain tip height (endpoint returns a bare integer)."""

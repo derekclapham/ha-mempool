@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from unittest.mock import patch
 
 import pytest
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -114,3 +116,88 @@ async def test_paths_are_joined_without_double_slash(
     await _client(hass, f"{BASE_URL}/").tip_height()
 
     assert str(aioclient_mock.mock_calls[0][1]) == f"{BASE_URL}{API_TIP_HEIGHT}"
+
+
+# --- hardening ----------------------------------------------------------------
+
+
+async def test_stdlib_json_accepts_bare_constants() -> None:
+    """Establish the premise for the test below.
+
+    `json.loads` is not strict by default: it parses `NaN` and `Infinity`
+    into floats, which is why the client has to opt out explicitly.
+    """
+    import json
+    import math
+
+    assert math.isnan(json.loads("NaN"))
+    assert math.isinf(json.loads("Infinity"))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        '{"progressPercent": NaN}',
+        '{"currentHashrate": Infinity}',
+    ],
+)
+async def test_rejects_bare_json_constants(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, body: str
+) -> None:
+    """NaN/Infinity would flow into states and statistics; refuse them."""
+    aioclient_mock.get(f"{BASE_URL}{API_DIFFICULTY}", text=body)
+
+    with pytest.raises(MempoolApiError, match="Invalid JSON"):
+        await _client(hass).difficulty_adjustment()
+
+
+async def test_rejects_oversized_body(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A body over the cap is abandoned rather than buffered whole."""
+    body = json.dumps({"progressPercent": 1.0, "pad": "x" * 4000})
+    aioclient_mock.get(f"{BASE_URL}{API_DIFFICULTY}", text=body)
+
+    with (
+        patch("custom_components.mempool.api._MAX_RESPONSE_BYTES", len(body) - 1),
+        pytest.raises(MempoolApiError, match="exceeded"),
+    ):
+        await _client(hass).difficulty_adjustment()
+
+
+async def test_accepts_body_exactly_at_the_cap(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """The benign path: a body right on the limit still parses.
+
+    Guards the off-by-one that would make the cap reject valid responses.
+    """
+    body = json.dumps({"progressPercent": 1.0, "pad": "x" * 4000})
+    aioclient_mock.get(f"{BASE_URL}{API_DIFFICULTY}", text=body)
+
+    with patch("custom_components.mempool.api._MAX_RESPONSE_BYTES", len(body)):
+        assert await _client(hass).difficulty_adjustment() == json.loads(body)
+
+
+async def test_real_world_body_is_well_under_the_cap() -> None:
+    """The cap has room for the largest endpoint by a wide margin.
+
+    historical-price measured ~1 MB on the public instance and grows by
+    roughly 65 KB a year, so 16 MiB is decades of headroom.
+    """
+    from custom_components.mempool.api import _MAX_RESPONSE_BYTES
+
+    assert _MAX_RESPONSE_BYTES >= 16 * 1024 * 1024
+
+
+async def test_non_utf8_body(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A body that is not UTF-8 is a clean error, not a decode traceback."""
+    aioclient_mock.get(f"{BASE_URL}{API_DIFFICULTY}", content=b"\xff\xfe\x00bad")
+
+    with pytest.raises(MempoolApiError, match="Non-UTF-8"):
+        await _client(hass).difficulty_adjustment()

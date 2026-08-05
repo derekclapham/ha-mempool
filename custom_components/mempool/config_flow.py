@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 import voluptuous as vol
 
@@ -36,6 +37,18 @@ from .const import (
     MEMPOOL_SPACE_URL,
     PUBLIC_FAST_INTERVAL,
 )
+
+
+def _is_valid_base_url(base_url: str) -> bool:
+    """True if the value is an absolute http(s) URL with a host.
+
+    The base URL is free-text and every request the integration makes is built
+    from it, so reject anything that is not an addressable http(s) endpoint
+    before we hand it to the client. Which host is allowed is deliberately not
+    restricted: pointing at a node on the local network is the normal case.
+    """
+    parsed = urlparse(base_url)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
 def _make_client(hass: HomeAssistant, base_url: str, verify_ssl: bool) -> MempoolClient:
@@ -128,20 +141,26 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            base_url = user_input[CONF_BASE_URL].rstrip("/")
+            base_url = user_input[CONF_BASE_URL].strip().rstrip("/")
             verify_ssl = user_input[CONF_VERIFY_SSL]
-            # The base URL is the unique ID, so the same instance can't be
-            # added twice (and a re-add updates rather than duplicates).
-            await self.async_set_unique_id(base_url)
-            self._abort_if_unique_id_configured()
-
-            client = _make_client(self.hass, base_url, verify_ssl)
-            if not await self._validate(client):
-                errors["base"] = "cannot_connect"
+            if not _is_valid_base_url(base_url):
+                errors["base"] = "invalid_url"
             else:
-                return await self._finish_setup(
-                    base_url, verify_ssl, int(user_input[CONF_FAST_INTERVAL]), client
-                )
+                # The base URL is the unique ID, so the same instance can't be
+                # added twice (and a re-add updates rather than duplicates).
+                await self.async_set_unique_id(base_url)
+                self._abort_if_unique_id_configured()
+
+                client = _make_client(self.hass, base_url, verify_ssl)
+                if not await self._validate(client):
+                    errors["base"] = "cannot_connect"
+                else:
+                    return await self._finish_setup(
+                        base_url,
+                        verify_ssl,
+                        int(user_input[CONF_FAST_INTERVAL]),
+                        client,
+                    )
 
         schema = vol.Schema(
             {

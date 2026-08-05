@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import CONF_BASE_URL, DOMAIN
+from .const import CONF_BASE_URL, DOMAIN, MEMPOOL_SPACE_URL
 from .coordinator import MempoolConfigEntry
 
 
@@ -36,11 +36,18 @@ class MempoolEntity(CoordinatorEntity[DataUpdateCoordinator[dict[str, Any]]]):
         # recorded history. Neither this composition nor the suffixes callers
         # pass in may change: doing so silently orphans that history.
         self._attr_unique_id = f"{entry.entry_id}_{unique_suffix}"
+        base_url = entry.data[CONF_BASE_URL]
         # One device per config entry (the instance); all entities group under it.
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
             manufacturer="mempool",
-            model="Self-hosted mempool",
-            configuration_url=entry.data[CONF_BASE_URL],
+            # Which kind of instance this entry actually talks to. Model is
+            # display metadata, not part of the device identity.
+            model=(
+                "mempool.space"
+                if base_url == MEMPOOL_SPACE_URL
+                else "Self-hosted mempool"
+            ),
+            configuration_url=base_url,
         )

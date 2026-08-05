@@ -37,7 +37,8 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API."
+      "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API.",
+      "invalid_url": "That does not look like a URL. Enter the full address including http:// or https://, for example http://mynode.example:8999."
     },
     "abort": {
       "already_configured": "This mempool instance is already configured.",
@@ -65,42 +66,114 @@
   },
   "entity": {
     "sensor": {
-      "block_height": { "name": "Block height" },
-      "fee_fastest": { "name": "Fee (fastest)" },
-      "fee_half_hour": { "name": "Fee (30 min)" },
-      "fee_hour": { "name": "Fee (1 hour)" },
-      "fee_economy": { "name": "Fee (economy)" },
-      "fee_minimum": { "name": "Fee (minimum)" },
-      "mempool_transactions": { "name": "Mempool transactions" },
-      "mempool_size": { "name": "Mempool size" },
-      "mempool_total_fees": { "name": "Mempool total fees" },
-      "difficulty_progress": { "name": "Difficulty adjustment progress" },
-      "difficulty_change": { "name": "Estimated difficulty change" },
-      "blocks_to_retarget": { "name": "Blocks to retarget" },
-      "next_retarget": { "name": "Next difficulty retarget" },
-      "hashrate": { "name": "Network hashrate" },
-      "difficulty": { "name": "Network difficulty" },
-      "latest_block_time": { "name": "Latest block" },
-      "latest_block_transactions": { "name": "Latest block transactions" },
-      "latest_block_size": { "name": "Latest block size" },
-      "latest_block_weight": { "name": "Latest block weight" },
-      "latest_block_miner": { "name": "Latest block miner" },
-      "latest_block_reward": { "name": "Latest block reward" },
-      "latest_block_fees": { "name": "Latest block fees" },
-      "latest_block_median_fee": { "name": "Latest block median fee" },
-      "projected_blocks": { "name": "Projected blocks" },
-      "next_block_fee": { "name": "Next block fee" },
-      "blocks_to_halving": { "name": "Blocks to halving" },
-      "block_subsidy": { "name": "Block subsidy" },
-      "next_halving": { "name": "Next halving" },
-      "blocks_per_hour": { "name": "Blocks per hour" },
-      "network_pace": { "name": "Network pace" },
-      "top_pool": { "name": "Top mining pool" },
-      "top_pool_share": { "name": "Top pool share" },
-      "mining_reward_24h": { "name": "Mining reward (24h)" },
-      "mining_fees_24h": { "name": "Mining fees (24h)" },
-      "mean_tx_fee_24h": { "name": "Mean transaction fee (24h)" },
-      "price": { "name": "BTC price" }
+      "block_height": {
+        "name": "Block height"
+      },
+      "fee_fastest": {
+        "name": "Fee (fastest)"
+      },
+      "fee_half_hour": {
+        "name": "Fee (30 min)"
+      },
+      "fee_hour": {
+        "name": "Fee (1 hour)"
+      },
+      "fee_economy": {
+        "name": "Fee (economy)"
+      },
+      "fee_minimum": {
+        "name": "Fee (minimum)"
+      },
+      "mempool_transactions": {
+        "name": "Mempool transactions"
+      },
+      "mempool_size": {
+        "name": "Mempool size"
+      },
+      "mempool_total_fees": {
+        "name": "Mempool total fees"
+      },
+      "difficulty_progress": {
+        "name": "Difficulty adjustment progress"
+      },
+      "difficulty_change": {
+        "name": "Estimated difficulty change"
+      },
+      "blocks_to_retarget": {
+        "name": "Blocks to retarget"
+      },
+      "next_retarget": {
+        "name": "Next difficulty retarget"
+      },
+      "hashrate": {
+        "name": "Network hashrate"
+      },
+      "difficulty": {
+        "name": "Network difficulty"
+      },
+      "latest_block_time": {
+        "name": "Latest block"
+      },
+      "latest_block_transactions": {
+        "name": "Latest block transactions"
+      },
+      "latest_block_size": {
+        "name": "Latest block size"
+      },
+      "latest_block_weight": {
+        "name": "Latest block weight"
+      },
+      "latest_block_miner": {
+        "name": "Latest block miner"
+      },
+      "latest_block_reward": {
+        "name": "Latest block reward"
+      },
+      "latest_block_fees": {
+        "name": "Latest block fees"
+      },
+      "latest_block_median_fee": {
+        "name": "Latest block median fee"
+      },
+      "projected_blocks": {
+        "name": "Projected blocks"
+      },
+      "next_block_fee": {
+        "name": "Next block fee"
+      },
+      "blocks_to_halving": {
+        "name": "Blocks to halving"
+      },
+      "block_subsidy": {
+        "name": "Block subsidy"
+      },
+      "next_halving": {
+        "name": "Next halving"
+      },
+      "blocks_per_hour": {
+        "name": "Blocks per hour"
+      },
+      "network_pace": {
+        "name": "Network pace"
+      },
+      "top_pool": {
+        "name": "Top mining pool"
+      },
+      "top_pool_share": {
+        "name": "Top pool share"
+      },
+      "mining_reward_24h": {
+        "name": "Mining reward (24h)"
+      },
+      "mining_fees_24h": {
+        "name": "Mining fees (24h)"
+      },
+      "mean_tx_fee_24h": {
+        "name": "Mean transaction fee (24h)"
+      },
+      "price": {
+        "name": "BTC price"
+      }
     }
   },
   "services": {

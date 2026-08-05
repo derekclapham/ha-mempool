@@ -9,6 +9,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from custom_components.mempool.const import (
     API_PRICES,
     API_TIP_HEIGHT,
+    CONF_BASE_URL,
     CONF_CURRENCY,
     CONF_FAST_INTERVAL,
     DOMAIN,
@@ -210,3 +211,37 @@ async def test_service_survives_unload(
     await hass.async_block_till_done()
 
     assert hass.services.has_service(DOMAIN, SERVICE_IMPORT_PRICE_HISTORY)
+
+
+async def test_device_model_reflects_the_instance_kind(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    device_registry: dr.DeviceRegistry,
+) -> None:
+    """The device model says which kind of instance the entry talks to."""
+    from .conftest import PUBLIC_URL, mock_endpoints
+
+    mock_endpoints(aioclient_mock)
+    mock_endpoints(aioclient_mock, PUBLIC_URL)
+
+    self_hosted = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=BASE_URL,
+        data={CONF_BASE_URL: BASE_URL, CONF_FAST_INTERVAL: 60},
+    )
+    public = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=PUBLIC_URL,
+        data={CONF_BASE_URL: PUBLIC_URL, CONF_FAST_INTERVAL: 300},
+    )
+
+    models = {}
+    for entry in (self_hosted, public):
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        device = dr.async_entries_for_config_entry(device_registry, entry.entry_id)[0]
+        models[entry.data[CONF_BASE_URL]] = device.model
+
+    assert models[PUBLIC_URL] == "mempool.space"
+    assert models[BASE_URL] == "Self-hosted mempool"
