@@ -18,7 +18,8 @@ from custom_components.mempool.const import (
     CONF_PRICE_ATTRIBUTES,
     DOMAIN,
 )
-from custom_components.mempool.sensor import SENSORS
+from custom_components.mempool.sensor import PRICE_SENSOR, SENSORS
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -179,6 +180,7 @@ async def test_sensor_values(
     mock_api: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
+    enable_all_entities: None,
 ) -> None:
     """Every sensor reports the value its payload implies."""
     freezer.move_to(NOW)
@@ -222,6 +224,7 @@ async def test_rolling_window_sensors(
     mock_api: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
+    enable_all_entities: None,
 ) -> None:
     """Four of the five fixture blocks fall inside the trailing hour."""
     freezer.move_to(NOW)
@@ -354,6 +357,7 @@ async def test_top_pool_sensors_with_no_pools(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
+    enable_all_entities: None,
 ) -> None:
     """An empty mining-pool list leaves both pool sensors unknown."""
     mock_endpoints(
@@ -429,3 +433,86 @@ async def test_unavailable_and_unknown_are_distinct(
     assert (
         _state(hass, mock_config_entry, "mempool_transactions") == STATE_UNAVAILABLE
     )
+
+
+# Sensors that ship switched off: secondary or restated values that most users
+# will not want recorded. Listed explicitly so the choice is reviewable and
+# cannot drift silently -- this only takes effect at first registration, so it
+# is invisible in normal use and would otherwise never be noticed if it changed.
+DISABLED_BY_DEFAULT = {
+    "block_subsidy",
+    "latest_block_median_fee",
+    "latest_block_weight",
+    "mean_tx_fee_24h",
+    "mining_fees_24h",
+    "mining_reward_24h",
+    "network_pace",
+    "projected_blocks",
+    "top_pool_share",
+}
+
+
+async def test_disabled_by_default_set() -> None:
+    """Exactly the intended sensors are disabled; the rest ship enabled."""
+    actual = {
+        description.key
+        for description in (*SENSORS, PRICE_SENSOR)
+        if not description.entity_registry_enabled_default
+    }
+
+    assert actual == DISABLED_BY_DEFAULT
+
+
+async def test_disabled_sensors_are_registered_but_absent(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """They exist in the registry, switched off, with no state."""
+    await _setup(hass, mock_config_entry)
+    registry = er.async_get(hass)
+
+    for key in DISABLED_BY_DEFAULT:
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{mock_config_entry.entry_id}_{key}"
+        )
+        assert entity_id is not None, key
+        assert registry.async_get(entity_id).disabled_by is not None, key
+        assert hass.states.get(entity_id) is None, key
+
+    # The headline sensors are untouched.
+    assert _state(hass, mock_config_entry, "block_height") == str(TIP_HEIGHT)
+    assert _state(hass, mock_config_entry, "price_usd") == "95000"
+
+
+async def test_block_size_has_a_device_class(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Block size is genuinely bytes, so it carries DATA_SIZE."""
+    await _setup(hass, mock_config_entry)
+
+    state = hass.states.get(_entity_id(hass, mock_config_entry, "latest_block_size"))
+    assert state.attributes["device_class"] == SensorDeviceClass.DATA_SIZE
+    assert state.attributes["unit_of_measurement"] == "MB"
+
+
+async def test_price_sensor_has_no_device_class(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """MONETARY requires state_class TOTAL, which would change the statistics.
+
+    The price sensor records a spot price as MEASUREMENT and already has
+    history, so it stays untagged rather than being reinterpreted as a total.
+    """
+    assert PRICE_SENSOR.device_class is None
+    assert PRICE_SENSOR.state_class is SensorStateClass.MEASUREMENT
+
+
+async def test_no_sensor_has_an_entity_category() -> None:
+    """Every sensor reports what the instance is *for*, so none is diagnostic."""
+    for description in (*SENSORS, PRICE_SENSOR):
+        assert description.entity_category is None, description.key

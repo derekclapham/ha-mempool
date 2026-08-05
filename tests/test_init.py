@@ -28,6 +28,7 @@ async def test_setup_and_unload(
     hass: HomeAssistant,
     mock_api: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
+    enable_all_entities: None,
 ) -> None:
     """A healthy instance loads every sensor and unloads cleanly."""
     mock_config_entry.add_to_hass(hass)
@@ -93,6 +94,7 @@ async def test_setup_without_price_feed(
     mock_api_no_price: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
     caplog: pytest.LogCaptureFixture,
+    enable_all_entities: None,
 ) -> None:
     """A missing price feed is a warning, not a setup failure."""
     mock_config_entry.add_to_hass(hass)

@@ -208,3 +208,18 @@ def mock_setup_entry() -> Generator[AsyncMock]:
         "custom_components.mempool.async_setup_entry", return_value=True
     ) as mock:
         yield mock
+
+
+@pytest.fixture
+def enable_all_entities() -> Generator[None]:
+    """Register every entity, including those disabled by default.
+
+    Mirrors Home Assistant core's `entity_registry_enabled_by_default`, which
+    pytest-homeassistant-custom-component does not re-export. Tests asserting
+    on values need it, since nine sensors ship switched off.
+    """
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        return_value=True,
+    ):
+        yield

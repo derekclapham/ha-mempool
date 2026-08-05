@@ -198,6 +198,22 @@ class MempoolSensorDescription(SensorEntityDescription):
 
 # The non-price sensors, in display order. `suggested_display_precision` only
 # rounds the UI — the recorded state keeps full precision for statistics.
+#
+# On entity categories: none of these carry one, deliberately. EntityCategory
+# classifies entities that describe the *device's own* configuration or health
+# rather than what it is for. Reporting chain and mempool state is precisely
+# what a mempool instance is for, so every sensor here is a primary entity and
+# the default (no category) is correct. If a sensor is ever added that
+# describes the instance itself — its sync status, say, or its database size —
+# that one is DIAGNOSTIC.
+#
+# On device classes: Home Assistant's device classes cover physical quantities
+# and none of them fit sat/vB, virtual bytes, hashrate, difficulty or a block
+# subsidy. The exceptions are the three timestamps (TIMESTAMP) and block size
+# (DATA_SIZE), which are tagged. The price sensor is deliberately left untagged
+# — MONETARY requires state_class TOTAL, and this is a spot price recorded as
+# MEASUREMENT, so tagging it would mean changing the statistics semantics of a
+# sensor that already has history.
 SENSORS: tuple[MempoolSensorDescription, ...] = (
     # ---- fast group (chain tip, fees, mempool) ----
     MempoolSensorDescription(
@@ -296,6 +312,9 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
         key="latest_block_size",
         translation_key="latest_block_size",
         native_unit_of_measurement="MB",
+        # The one sensor here measuring a quantity Home Assistant has a device
+        # class for; see the note above SENSORS for why the others do not.
+        device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
         group="fast",
@@ -305,6 +324,9 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_weight",
         translation_key="latest_block_weight",
+        # Off by default: obscure unit (weight units); latest_block_size
+        # already covers how full a block is.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="MWU",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -341,6 +363,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_median_fee",
         translation_key="latest_block_median_fee",
+        # Off by default: the five fee-tier sensors already cover fee levels.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -351,6 +375,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="projected_blocks",
         translation_key="projected_blocks",
+        # Off by default: changes on nearly every poll and is of niche interest.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="blocks",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -378,6 +404,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="block_subsidy",
         translation_key="block_subsidy",
+        # Off by default: derivable from block height and changes once every four years.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=3,
@@ -404,6 +432,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="network_pace",
         translation_key="network_pace",
+        # Off by default: a restatement of blocks_per_hour as a percentage.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -476,6 +506,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="top_pool_share",
         translation_key="top_pool_share",
+        # Off by default: niche; top_pool names the pool, which is the interesting part.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -486,6 +518,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mining_reward_24h",
         translation_key="mining_reward_24h",
+        # Off by default: mining statistic, of interest to few users.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -496,6 +530,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mining_fees_24h",
         translation_key="mining_fees_24h",
+        # Off by default: mining statistic, of interest to few users.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=3,
@@ -505,6 +541,8 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mean_tx_fee_24h",
         translation_key="mean_tx_fee_24h",
+        # Off by default: mining statistic, of interest to few users.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement="sat",
         state_class=SensorStateClass.MEASUREMENT,
         group="slow",
