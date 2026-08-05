@@ -80,3 +80,30 @@ def test_config_flow_steps_are_described() -> None:
         fields = config["step"][step]["data"]
         descriptions = config["step"][step]["data_description"]
         assert set(fields) == set(descriptions), step
+
+
+def test_every_sensor_has_an_icon() -> None:
+    """Icons live in icons.json, keyed by translation key."""
+    icons = json.loads((COMPONENT / "icons.json").read_text())["entity"]["sensor"]
+
+    for description in (*SENSORS, PRICE_SENSOR):
+        assert description.translation_key in icons, description.key
+        assert icons[description.translation_key]["default"].startswith("mdi:")
+
+
+def test_no_orphan_icons() -> None:
+    """Every icons.json entry belongs to a sensor that exists."""
+    icons = json.loads((COMPONENT / "icons.json").read_text())["entity"]["sensor"]
+    used = {d.translation_key for d in (*SENSORS, PRICE_SENSOR)}
+
+    assert set(icons) == used
+
+
+def test_descriptions_do_not_carry_icons() -> None:
+    """Icons must not be defined in both places.
+
+    The icon-translations rule is explicit that the `icon` attribute comes off
+    the EntityDescription once icons.json exists, so the two cannot drift.
+    """
+    for description in (*SENSORS, PRICE_SENSOR):
+        assert description.icon is None, description.key

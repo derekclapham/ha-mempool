@@ -28,8 +28,9 @@ PARALLEL_UPDATES = 0
 
 # --- small helpers used by the value_fn lambdas -------------------------------
 # Each pulls a field out of the relevant coordinator payload sub-dict and is
-# defensive: a partial/early payload yields None (which marks the sensor
-# unavailable) rather than raising.
+# defensive: a partial/early payload yields None (which reads as `unknown`)
+# rather than raising. See MempoolSensor.native_value for why that is not
+# `unavailable`.
 
 
 def _num(value: Any) -> float | None:
@@ -202,7 +203,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="block_height",
         translation_key="block_height",
-        icon="mdi:cube-outline",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
         value_fn=lambda d, _c: d.get("height"),
@@ -210,7 +210,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="fee_fastest",
         translation_key="fee_fastest",
-        icon="mdi:rocket-launch-outline",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -219,7 +218,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="fee_half_hour",
         translation_key="fee_half_hour",
-        icon="mdi:clock-fast",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -228,7 +226,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="fee_hour",
         translation_key="fee_hour",
-        icon="mdi:clock-outline",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -237,7 +234,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="fee_economy",
         translation_key="fee_economy",
-        icon="mdi:cash-minus",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -246,7 +242,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="fee_minimum",
         translation_key="fee_minimum",
-        icon="mdi:cash-remove",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -255,7 +250,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mempool_transactions",
         translation_key="mempool_transactions",
-        icon="mdi:file-tree-outline",
         native_unit_of_measurement="tx",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -264,7 +258,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mempool_size",
         translation_key="mempool_size",
-        icon="mdi:database-outline",
         native_unit_of_measurement="MvB",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -275,7 +268,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mempool_total_fees",
         translation_key="mempool_total_fees",
-        icon="mdi:cash-multiple",
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=3,
@@ -287,7 +279,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_time",
         translation_key="latest_block_time",
-        icon="mdi:cube",
         device_class=SensorDeviceClass.TIMESTAMP,
         suggested_display_precision=None,  # datetime; renders as "x min ago"
         group="fast",
@@ -296,7 +287,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_transactions",
         translation_key="latest_block_transactions",
-        icon="mdi:swap-horizontal",
         native_unit_of_measurement="tx",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -305,7 +295,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_size",
         translation_key="latest_block_size",
-        icon="mdi:database",
         native_unit_of_measurement="MB",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -316,7 +305,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_weight",
         translation_key="latest_block_weight",
-        icon="mdi:weight",
         native_unit_of_measurement="MWU",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -327,7 +315,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_miner",
         translation_key="latest_block_miner",
-        icon="mdi:pickaxe",
         suggested_display_precision=None,  # string
         group="fast",
         value_fn=lambda d, _c: _block_pool(d),
@@ -335,7 +322,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_reward",
         translation_key="latest_block_reward",
-        icon="mdi:cash-plus",
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=4,
@@ -346,7 +332,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_fees",
         translation_key="latest_block_fees",
-        icon="mdi:cash",
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=4,
@@ -356,7 +341,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="latest_block_median_fee",
         translation_key="latest_block_median_fee",
-        icon="mdi:cash-clock",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -367,7 +351,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="projected_blocks",
         translation_key="projected_blocks",
-        icon="mdi:layers-triple",
         native_unit_of_measurement="blocks",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -377,7 +360,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="next_block_fee",
         translation_key="next_block_fee",
-        icon="mdi:cube-send",
         native_unit_of_measurement="sat/vB",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -388,7 +370,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="blocks_to_halving",
         translation_key="blocks_to_halving",
-        icon="mdi:sync",
         native_unit_of_measurement="blocks",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -397,7 +378,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="block_subsidy",
         translation_key="block_subsidy",
-        icon="mdi:bitcoin",
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=3,
@@ -407,7 +387,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="next_halving",
         translation_key="next_halving",
-        icon="mdi:calendar-star",
         device_class=SensorDeviceClass.TIMESTAMP,
         suggested_display_precision=None,  # datetime; renders as a countdown
         group="fast",
@@ -417,7 +396,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="blocks_per_hour",
         translation_key="blocks_per_hour",
-        icon="mdi:timer-sand",
         native_unit_of_measurement="blocks/h",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -426,7 +404,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="network_pace",
         translation_key="network_pace",
-        icon="mdi:speedometer",
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         group="fast",
@@ -437,7 +414,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="difficulty_progress",
         translation_key="difficulty_progress",
-        icon="mdi:progress-clock",
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -447,7 +423,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="difficulty_change",
         translation_key="difficulty_change",
-        icon="mdi:swap-vertical-bold",
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -457,7 +432,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="blocks_to_retarget",
         translation_key="blocks_to_retarget",
-        icon="mdi:cube-scan",
         native_unit_of_measurement="blocks",
         state_class=SensorStateClass.MEASUREMENT,
         group="slow",
@@ -466,7 +440,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="next_retarget",
         translation_key="next_retarget",
-        icon="mdi:calendar-clock",
         device_class=SensorDeviceClass.TIMESTAMP,
         suggested_display_precision=None,  # precision is meaningless for a datetime
         group="slow",
@@ -475,7 +448,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="hashrate",
         translation_key="hashrate",
-        icon="mdi:speedometer",
         native_unit_of_measurement="EH/s",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -486,7 +458,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="difficulty",
         translation_key="difficulty",
-        icon="mdi:chart-line-variant",
         native_unit_of_measurement="T",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -498,7 +469,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="top_pool",
         translation_key="top_pool",
-        icon="mdi:account-hard-hat",
         suggested_display_precision=None,  # string
         group="slow",
         value_fn=lambda d, _c: (_pools(d)[0].get("name") if _pools(d) else None),
@@ -506,7 +476,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="top_pool_share",
         translation_key="top_pool_share",
-        icon="mdi:chart-pie",
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -517,7 +486,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mining_reward_24h",
         translation_key="mining_reward_24h",
-        icon="mdi:cash-plus",
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -528,7 +496,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mining_fees_24h",
         translation_key="mining_fees_24h",
-        icon="mdi:cash",
         native_unit_of_measurement="BTC",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=3,
@@ -538,7 +505,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
     MempoolSensorDescription(
         key="mean_tx_fee_24h",
         translation_key="mean_tx_fee_24h",
-        icon="mdi:cash-clock",
         native_unit_of_measurement="sat",
         state_class=SensorStateClass.MEASUREMENT,
         group="slow",
@@ -551,7 +517,6 @@ SENSORS: tuple[MempoolSensorDescription, ...] = (
 PRICE_SENSOR = MempoolSensorDescription(
     key="price",
     translation_key="price",
-    icon="mdi:bitcoin",
     state_class=SensorStateClass.MEASUREMENT,
     suggested_display_precision=0,
     group="price",
