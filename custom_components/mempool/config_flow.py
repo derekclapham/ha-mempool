@@ -6,11 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
@@ -74,12 +70,18 @@ def _fast_interval_selector() -> NumberSelector:
     """Slider/box for the fast poll interval (seconds)."""
     return NumberSelector(
         NumberSelectorConfig(
-            min=15, max=3600, step=5, unit_of_measurement="s", mode=NumberSelectorMode.BOX
+            min=15,
+            max=3600,
+            step=5,
+            unit_of_measurement="s",
+            mode=NumberSelectorMode.BOX,
         )
     )
 
 
-def _currency_default(hass: HomeAssistant, currencies: list[str], current: str | None) -> str:
+def _currency_default(
+    hass: HomeAssistant, currencies: list[str], current: str | None
+) -> str:
     """Pick a sensible default currency for the dropdown."""
     for candidate in (current, hass.config.currency, "USD"):
         if candidate in currencies:
@@ -216,7 +218,9 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
     def _create(self) -> ConfigFlowResult:
         """Create the entry with a title derived from the host."""
         host = self._data[CONF_BASE_URL].split("//")[-1]
-        return self.async_create_entry(title=f"{DEFAULT_NAME} ({host})", data=self._data)
+        return self.async_create_entry(
+            title=f"{DEFAULT_NAME} ({host})", data=self._data
+        )
 
     @staticmethod
     @callback

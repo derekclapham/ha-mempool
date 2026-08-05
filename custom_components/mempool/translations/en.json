@@ -31,6 +31,7 @@
           "price_attributes": "Expose other currencies as attributes"
         },
         "data_description": {
+          "currency": "Only the fiats your instance actually publishes are listed. This choice sets the price sensor's unit and its long-term statistics.",
           "price_attributes": "Optionally attach every other fiat your instance serves to the price sensor as attributes, for templating. These are not recorded as long-term statistics."
         }
       }

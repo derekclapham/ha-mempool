@@ -10,3 +10,5 @@ venv/
 
 # Local icon source files (finals live in custom_components/mempool/brand/)
 icons-src/
+.coverage
+htmlcov/

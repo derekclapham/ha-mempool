@@ -83,7 +83,9 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
     client = entry.runtime_data.client
     try:
         raw = await client.historical_price(currency)
-    except Exception as err:  # noqa: BLE001 - surfaced to the user
+    # Deliberately broad: whatever the client raises is re-raised as a
+    # HomeAssistantError so the user sees it rather than a traceback.
+    except Exception as err:
         raise HomeAssistantError(f"Failed to fetch historical price: {err}") from err
 
     # The feed is {"prices": [...]}; tolerate a bare list just in case.
