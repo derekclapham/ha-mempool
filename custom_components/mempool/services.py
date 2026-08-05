@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
@@ -31,9 +32,10 @@ _SCHEMA = vol.Schema({vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string})
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
-    """Register integration services once (idempotent across config entries)."""
-    if hass.services.has_service(DOMAIN, SERVICE_IMPORT_PRICE_HISTORY):
-        return
+    """Register the integration's service actions.
+
+    Called once from `async_setup`, so no per-entry idempotency guard is needed.
+    """
 
     async def _import_price_history(call: ServiceCall) -> None:
         await _handle_import_price_history(hass, call)
@@ -59,7 +61,9 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
     if entry is None or entry.domain != DOMAIN:
         raise ServiceValidationError(f"Unknown mempool config entry: {entry_id}")
 
-    if getattr(entry, "runtime_data", None) is None:
+    # The action can be called while no entry is loaded, so check the state
+    # rather than assuming runtime_data is populated.
+    if entry.state is not ConfigEntryState.LOADED:
         raise ServiceValidationError("The mempool entry is not loaded.")
 
     entry = _typed(entry)

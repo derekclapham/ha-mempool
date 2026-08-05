@@ -14,14 +14,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_BASE_URL, DOMAIN, HALVING_INTERVAL, INITIAL_SUBSIDY
+from .const import HALVING_INTERVAL, INITIAL_SUBSIDY
 from .coordinator import MempoolConfigEntry
+from .entity import MempoolEntity
 
 # Read-only sensors backed by coordinators; nothing to serialise on update.
 PARALLEL_UPDATES = 0
@@ -587,10 +586,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class MempoolSensor(CoordinatorEntity, SensorEntity):
+class MempoolSensor(MempoolEntity, SensorEntity):
     """A single value derived from a coordinator's payload."""
 
-    _attr_has_entity_name = True
     entity_description: MempoolSensorDescription
 
     def __init__(
@@ -602,30 +600,22 @@ class MempoolSensor(CoordinatorEntity, SensorEntity):
         expose_currencies: bool = False,
     ) -> None:
         """Bind the sensor to its coordinator and config entry."""
-        super().__init__(coordinator)
+        # The price sensor's unique_id carries the currency so switching fiats
+        # yields a distinct statistic rather than mixing units in one series.
+        unique_suffix = (
+            description.key
+            if description.key != "price"
+            else f"price_{(currency or '').lower()}"
+        )
+        super().__init__(coordinator, entry, unique_suffix)
         self.entity_description = description
         self._currency = currency
         # Only the price sensor, and only when the user opted in.
         self._expose_currencies = expose_currencies
-        # The price sensor's unique_id carries the currency so switching fiats
-        # yields a distinct statistic rather than mixing units in one series.
-        self._attr_unique_id = (
-            f"{entry.entry_id}_{description.key}"
-            if description.key != "price"
-            else f"{entry.entry_id}_price_{(currency or '').lower()}"
-        )
         # Price unit is per-entry (the chosen fiat), so it's set here rather
         # than statically on the description.
         if description.key == "price" and currency:
             self._attr_native_unit_of_measurement = currency
-        # One device per config entry (the node); all sensors group under it.
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.title,
-            manufacturer="mempool",
-            model="Self-hosted mempool",
-            configuration_url=entry.data[CONF_BASE_URL],
-        )
 
     @property
     def native_value(self) -> StateType | datetime:

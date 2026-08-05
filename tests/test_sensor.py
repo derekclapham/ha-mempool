@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
@@ -355,3 +357,36 @@ async def test_top_pool_sensors_with_no_pools(
 
     assert _state(hass, mock_config_entry, "top_pool") == STATE_UNAVAILABLE
     assert _state(hass, mock_config_entry, "top_pool_share") == STATE_UNAVAILABLE
+
+
+async def test_entity_naming_conventions(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Every entity has a unique ID, a translated name and has_entity_name."""
+    await _setup(hass, mock_config_entry)
+    registry = er.async_get(hass)
+
+    entries = er.async_entries_for_config_entry(
+        registry, mock_config_entry.entry_id
+    )
+    assert entries
+
+    names = json.loads(
+        (
+            Path(__file__).parent.parent
+            / "custom_components"
+            / "mempool"
+            / "strings.json"
+        ).read_text()
+    )["entity"]["sensor"]
+
+    for entry in entries:
+        assert entry.unique_id
+        assert entry.has_entity_name
+        assert entry.translation_key
+        # The displayed name must actually resolve from strings.json. A key
+        # with no matching entry leaves the entity nameless and collapses its
+        # entity_id to the device name alone.
+        assert entry.original_name == names[entry.translation_key]["name"]

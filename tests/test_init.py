@@ -173,3 +173,40 @@ async def test_service_registered_on_setup(
     await hass.async_block_till_done()
 
     assert hass.services.has_service(DOMAIN, SERVICE_IMPORT_PRICE_HISTORY)
+
+
+async def test_service_registered_even_when_entry_fails_to_load(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Actions are registered in async_setup, so they survive a failed entry.
+
+    This is the point of the action-setup rule: automations that call the
+    action can still be validated when no entry is loaded.
+    """
+    aioclient_mock.get(f"{BASE_URL}{API_PRICES}", status=500)
+    aioclient_mock.get(f"{BASE_URL}{API_TIP_HEIGHT}", status=500)
+
+    mock_config_entry.add_to_hass(hass)
+    assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert hass.services.has_service(DOMAIN, SERVICE_IMPORT_PRICE_HISTORY)
+
+
+async def test_service_survives_unload(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Unloading the last entry does not deregister the global action."""
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert hass.services.has_service(DOMAIN, SERVICE_IMPORT_PRICE_HISTORY)
