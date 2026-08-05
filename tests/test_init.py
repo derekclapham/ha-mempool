@@ -245,3 +245,44 @@ async def test_device_model_reflects_the_instance_kind(
 
     assert models[PUBLIC_URL] == "mempool.space"
     assert models[BASE_URL] == "Self-hosted mempool"
+
+
+async def test_unload_removes_the_options_listener(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Unloading detaches the update listener registered during setup.
+
+    Registered via entry.async_on_unload, so nothing is left subscribed that
+    would reload a config entry that is no longer loaded.
+    """
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert len(mock_config_entry.update_listeners) == 1
+
+    assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert not mock_config_entry.update_listeners
+
+
+async def test_reload_cycles_cleanly(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Repeated reloads neither leak listeners nor duplicate entities."""
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    entity_count = len(hass.states.async_entity_ids("sensor"))
+
+    for _ in range(3):
+        assert await hass.config_entries.async_reload(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    assert len(mock_config_entry.update_listeners) == 1
+    assert len(hass.states.async_entity_ids("sensor")) == entity_count

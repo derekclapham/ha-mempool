@@ -238,8 +238,13 @@ async def test_fetch_failure(
 
     await _setup(hass, mock_config_entry)
 
-    with pytest.raises(HomeAssistantError):
+    # A failing upstream is the service malfunctioning, not the user getting
+    # the call wrong, so it must be HomeAssistantError and specifically not
+    # ServiceValidationError -- which subclasses it and would pass a looser
+    # assertion.
+    with pytest.raises(HomeAssistantError) as err:
         await _call(hass, mock_config_entry.entry_id)
+    assert not isinstance(err.value, ServiceValidationError)
 
 
 async def test_empty_feed(
@@ -255,8 +260,9 @@ async def test_empty_feed(
 
     await _setup(hass, mock_config_entry)
 
-    with pytest.raises(HomeAssistantError):
+    with pytest.raises(HomeAssistantError) as err:
         await _call(hass, mock_config_entry.entry_id)
+    assert not isinstance(err.value, ServiceValidationError)
 
 
 async def test_uses_options_currency(
