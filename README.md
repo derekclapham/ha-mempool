@@ -173,6 +173,13 @@ The full integration documentation, written in the format
 is staged in [`docs/`](docs/). See [docs/README.md](docs/README.md) for why it
 lives there rather than being published.
 
+## Security
+
+The instance this integration talks to is treated as untrusted input, and the
+release pipeline is treated as production code. [SECURITY.md](SECURITY.md)
+describes the principles and the mechanisms that enforce them, and explains how
+to report a vulnerability privately.
+
 ## Disclaimer
 
 Not affiliated with the mempool.space project. Bitcoin data is provided by your configured instance.
