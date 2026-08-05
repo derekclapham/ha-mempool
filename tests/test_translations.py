@@ -144,3 +144,27 @@ def test_exception_placeholders_are_supplied() -> None:
         block = source.split(f'translation_key="{key}"')[1].split(")")[0]
         for name in placeholders:
             assert f'"{name}"' in block, f"{key} never supplies {{{name}}}"
+
+
+def test_no_urls_in_user_facing_strings() -> None:
+    """hassfest rejects a URL anywhere in strings.json.
+
+    Its reasoning is that a literal address cannot be localised and dates
+    badly; the guidance is to use a description placeholder instead. Checked
+    here because hassfest only runs in CI, so without this the failure is a
+    round trip to GitHub rather than a local test run.
+    """
+    strings = json.loads(STRINGS.read_text())
+
+    def walk(node: object, path: str = "") -> list[str]:
+        if isinstance(node, dict):
+            return [
+                hit
+                for key, value in node.items()
+                for hit in walk(value, f"{path}.{key}" if path else key)
+            ]
+        if isinstance(node, str) and re.search(r"https?://", node):
+            return [f"{path}: {node}"]
+        return []
+
+    assert not walk(strings)

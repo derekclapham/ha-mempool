@@ -25,13 +25,15 @@ jobs:
           # requires-python >=3.14.2, so 3.13 fails at install time.
           python-version: "3.14"
           cache: pip
+          # setup-python's pip cache needs a file to key on, and this repository
+          # has neither requirements.txt nor pyproject.toml at the root, so it
+          # has to be pointed at the one that exists.
+          cache-dependency-path: requirements-test.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # pytest-homeassistant-custom-component pins the Home Assistant it
-          # tests against, so it is the single source of the HA version here.
-          pip install pytest-homeassistant-custom-component pytest-cov ruff mypy
+          pip install -r requirements-test.txt
 
       - name: Lint
         # Home Assistant's own conventions, not ruff's defaults; the two

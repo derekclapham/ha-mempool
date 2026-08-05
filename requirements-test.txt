@@ -1,0 +1,11 @@
+# Development and CI dependencies. Not shipped: the HACS release archive is
+# built from custom_components/mempool/ only, and the integration itself
+# declares no runtime requirements in its manifest.
+#
+# Home Assistant is deliberately not listed. pytest-homeassistant-custom-component
+# pins the exact Home Assistant version it tests against, and naming it here as
+# well would let the two disagree.
+pytest-homeassistant-custom-component
+pytest-cov
+ruff
+mypy

@@ -52,7 +52,7 @@
     },
     "error": {
       "cannot_connect": "Failed to connect. Check the URL is reachable from Home Assistant and points at a mempool API.",
-      "invalid_url": "That does not look like a URL. Enter the full address including http:// or https://, for example http://mynode.example:8999."
+      "invalid_url": "That does not look like an address. Enter the full base URL of your mempool instance, including the scheme, host and port."
     },
     "abort": {
       "already_configured": "This mempool instance is already configured.",
