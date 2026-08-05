@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_VERIFY_SSL,
     DOMAIN,
     LOGGER,
+    MEMPOOL_SPACE_URL,
     PLATFORMS,
 )
 from .coordinator import (
@@ -96,6 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MempoolConfigEntry) -> b
                 currency,
                 client.base_url,
             )
+    _async_review_price_feed_issue(hass, entry, currency, feed_ok=price is not None)
 
     # First refresh before creating entities so they start with real values;
     # if the node is unreachable this raises ConfigEntryNotReady and HA retries.
@@ -112,6 +114,56 @@ async def async_setup_entry(hass: HomeAssistant, entry: MempoolConfigEntry) -> b
     # Reload (rebuilding coordinators with the new interval) when options change.
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
+
+
+def _price_feed_issue_id(entry: MempoolConfigEntry) -> str:
+    """Repair issue ID for one entry's missing price feed."""
+    return f"price_feed_unavailable_{entry.entry_id}"
+
+
+@callback
+def _async_review_price_feed_issue(
+    hass: HomeAssistant,
+    entry: MempoolConfigEntry,
+    currency: str | None,
+    *,
+    feed_ok: bool,
+) -> None:
+    """Raise or clear the repair issue for a missing price feed.
+
+    Evaluated on every setup, not only when the state changes, so the issue
+    clears on the next reload once the user switches their feed on — and a
+    reload already happens whenever options change.
+
+    Deliberately limited to self-hosted instances. A repair issue is meant to
+    be actionable, and a user can enable the price feed on their own node; if
+    the public mempool.space price feed is down there is nothing they can do
+    about it, so raising one there would be noise the rule warns against.
+    """
+    issue_id = _price_feed_issue_id(entry)
+    is_public = entry.data[CONF_BASE_URL] == MEMPOOL_SPACE_URL
+
+    if feed_ok or not currency or is_public:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="price_feed_unavailable",
+        translation_placeholders={
+            "title": entry.title,
+            "currency": currency,
+        },
+    )
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: MempoolConfigEntry) -> None:
+    """Clean up anything the entry owns outside its own runtime data."""
+    ir.async_delete_issue(hass, DOMAIN, _price_feed_issue_id(entry))
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MempoolConfigEntry) -> bool:

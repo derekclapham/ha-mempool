@@ -22,6 +22,7 @@ from custom_components.mempool.const import (
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 
 from .conftest import BASE_URL, PUBLIC_URL, mock_endpoints
 
@@ -473,3 +474,184 @@ async def test_surrounding_whitespace_is_trimmed(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_BASE_URL] == BASE_URL
+
+
+# --- reconfigure flow ---------------------------------------------------------
+
+
+async def test_reconfigure_changes_the_url(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """A moved instance can be re-pointed without re-adding the entry."""
+    moved_url = "http://moved.test"
+    mock_endpoints(aioclient_mock)
+    mock_endpoints(aioclient_mock, moved_url)
+    mock_config_entry.add_to_hass(hass)
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: moved_url, CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 90},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert mock_config_entry.data[CONF_BASE_URL] == moved_url
+    assert mock_config_entry.data[CONF_FAST_INTERVAL] == 90
+    assert mock_config_entry.unique_id == moved_url
+    assert mock_config_entry.title == "Mempool (moved.test)"
+
+
+async def test_reconfigure_keeps_entity_history(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Re-pointing the URL must not disturb any entity unique_id.
+
+    This is the whole reason the flow exists rather than telling users to
+    delete and re-add: unique_ids derive from the entry ID, so they survive.
+    """
+    moved_url = "http://moved.test"
+    mock_endpoints(aioclient_mock)
+    mock_endpoints(aioclient_mock, moved_url)
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    before = {
+        entity.unique_id
+        for entity in er.async_entries_for_config_entry(
+            registry, mock_config_entry.entry_id
+        )
+    }
+    assert before
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: moved_url, CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 60},
+    )
+    await hass.async_block_till_done()
+
+    after = {
+        entity.unique_id
+        for entity in er.async_entries_for_config_entry(
+            registry, mock_config_entry.entry_id
+        )
+    }
+    assert after == before
+
+
+async def test_reconfigure_rejects_another_entrys_instance(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Re-pointing onto an instance another entry owns is refused."""
+    mock_endpoints(aioclient_mock)
+    mock_endpoints(aioclient_mock, PUBLIC_URL)
+    mock_config_entry.add_to_hass(hass)
+    MockConfigEntry(
+        domain=DOMAIN, unique_id=PUBLIC_URL, data={CONF_BASE_URL: PUBLIC_URL}
+    ).add_to_hass(hass)
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: PUBLIC_URL, CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 60},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    # The entry it was invoked on is untouched.
+    assert mock_config_entry.data[CONF_BASE_URL] == BASE_URL
+
+
+async def test_reconfigure_same_url_is_allowed(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Resubmitting the entry's own URL is not a duplicate."""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: BASE_URL, CONF_VERIFY_SSL: False, CONF_FAST_INTERVAL: 45},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert mock_config_entry.data[CONF_VERIFY_SSL] is False
+    assert mock_config_entry.data[CONF_FAST_INTERVAL] == 45
+
+
+async def test_reconfigure_onto_public_forces_gentle_interval(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Reconfigure cannot smuggle a fast poll onto the shared public API."""
+    mock_endpoints(aioclient_mock)
+    mock_endpoints(aioclient_mock, PUBLIC_URL)
+    mock_config_entry.add_to_hass(hass)
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: PUBLIC_URL, CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 15},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert mock_config_entry.data[CONF_FAST_INTERVAL] == PUBLIC_FAST_INTERVAL
+
+
+async def test_reconfigure_cannot_connect(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """An unreachable new URL keeps the user in the form."""
+    mock_endpoints(aioclient_mock)
+    aioclient_mock.get(f"http://dead.test{API_DIFFICULTY}", status=500)
+    mock_config_entry.add_to_hass(hass)
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_BASE_URL: "http://dead.test",
+            CONF_VERIFY_SSL: True,
+            CONF_FAST_INTERVAL: 60,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+    assert mock_config_entry.data[CONF_BASE_URL] == BASE_URL
+
+
+async def test_reconfigure_rejects_invalid_url(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """The same URL validation applies as on first setup."""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BASE_URL: "nope", CONF_VERIFY_SSL: True, CONF_FAST_INTERVAL: 60},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_url"}

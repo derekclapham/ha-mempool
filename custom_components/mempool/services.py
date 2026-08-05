@@ -59,12 +59,18 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
     entry_id: str = call.data[ATTR_CONFIG_ENTRY_ID]
     entry = hass.config_entries.async_get_entry(entry_id)
     if entry is None or entry.domain != DOMAIN:
-        raise ServiceValidationError(f"Unknown mempool config entry: {entry_id}")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="entry_not_found",
+            translation_placeholders={"entry_id": entry_id},
+        )
 
     # The action can be called while no entry is loaded, so check the state
     # rather than assuming runtime_data is populated.
     if entry.state is not ConfigEntryState.LOADED:
-        raise ServiceValidationError("The mempool entry is not loaded.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="entry_not_loaded"
+        )
 
     entry = _typed(entry)
     # Options win over the setup-time data (the currency can be changed later).
@@ -72,7 +78,9 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
         CONF_CURRENCY, entry.data.get(CONF_CURRENCY)
     )
     if not currency:
-        raise ServiceValidationError("This entry has no price currency configured.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_currency"
+        )
 
     # Statistics are keyed by the entity_id, so resolve it from the price
     # sensor's unique_id (which encodes the entry + currency, see sensor.py).
@@ -81,7 +89,7 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
     statistic_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
     if statistic_id is None:
         raise ServiceValidationError(
-            "Price sensor not found — is the price feed enabled on the node?"
+            translation_domain=DOMAIN, translation_key="price_sensor_missing"
         )
 
     client = entry.runtime_data.client
@@ -90,13 +98,19 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
     # Deliberately broad: whatever the client raises is re-raised as a
     # HomeAssistantError so the user sees it rather than a traceback.
     except Exception as err:
-        raise HomeAssistantError(f"Failed to fetch historical price: {err}") from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="historical_fetch_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
     # The feed is {"prices": [...]}; tolerate a bare list just in case.
     points = raw.get("prices", raw) if isinstance(raw, dict) else raw
     stats = _to_hourly_stats(points, currency, StatisticData)
     if not stats:
-        raise HomeAssistantError("Historical price feed returned no usable data.")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="no_usable_history"
+        )
 
     # source="recorder" + a plain entity_id imports into that entity's own
     # long-term stats (an upsert per hour), so re-running is safe. has_mean

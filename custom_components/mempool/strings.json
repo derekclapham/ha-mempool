@@ -34,6 +34,20 @@
           "currency": "Only the fiats your instance actually publishes are listed. This choice sets the price sensor's unit and its long-term statistics.",
           "price_attributes": "Optionally attach every other fiat your instance serves to the price sensor as attributes, for templating. These are not recorded as long-term statistics."
         }
+      },
+      "reconfigure": {
+        "title": "Change instance URL",
+        "description": "Point this entry at a different address for your mempool instance. Your existing sensors and their history are kept.",
+        "data": {
+          "base_url": "Base URL",
+          "verify_ssl": "Verify SSL certificate",
+          "fast_interval": "Fast poll interval (seconds)"
+        },
+        "data_description": {
+          "base_url": "The new base URL, including the scheme, host and port. Use this when your instance has moved rather than removing and re-adding it.",
+          "verify_ssl": "Turn off for an HTTPS instance with a self-signed certificate.",
+          "fast_interval": "How often to poll fast-changing data (chain tip, fees, mempool). Forced to 300 s if you point this entry at the public mempool.space."
+        }
       }
     },
     "error": {
@@ -42,7 +56,8 @@
     },
     "abort": {
       "already_configured": "This mempool instance is already configured.",
-      "cannot_connect": "Could not reach mempool.space right now. Please try again."
+      "cannot_connect": "Could not reach mempool.space right now. Please try again.",
+      "reconfigure_successful": "The mempool instance URL was updated."
     }
   },
   "options": {
@@ -186,6 +201,32 @@
           "description": "The mempool instance whose price history should be imported."
         }
       }
+    }
+  },
+  "exceptions": {
+    "entry_not_found": {
+      "message": "No mempool instance found with ID {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "That mempool instance is not loaded. Check it is reachable, then try again."
+    },
+    "no_currency": {
+      "message": "That mempool instance has no price currency configured, so there is no price history to import."
+    },
+    "price_sensor_missing": {
+      "message": "No price sensor exists for that mempool instance. Its price feed is probably switched off."
+    },
+    "historical_fetch_failed": {
+      "message": "Could not fetch the historical price feed: {error}"
+    },
+    "no_usable_history": {
+      "message": "The historical price feed returned no usable data."
+    }
+  },
+  "issues": {
+    "price_feed_unavailable": {
+      "title": "Bitcoin price feed unavailable",
+      "description": "{title} is set to report the Bitcoin price in {currency}, but its price feed is not returning that currency, so the price sensor has not been created.\n\nmempool instances only serve prices when the price feed is enabled. Switch it on in your instance's configuration and restart it, then reload this entry. If you would rather not run the price feed, reconfigure the entry and the price sensor will stay absent without this warning."
     }
   }
 }

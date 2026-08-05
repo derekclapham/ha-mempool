@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 
 import yaml
 
@@ -107,3 +108,39 @@ def test_descriptions_do_not_carry_icons() -> None:
     """
     for description in (*SENSORS, PRICE_SENSOR):
         assert description.icon is None, description.key
+
+
+def test_exception_messages_are_translatable() -> None:
+    """Every translation key raised by the code has a message.
+
+    The exception-translations rule is satisfied by the raise sites carrying a
+    key; this checks the other end, since a missing entry surfaces to the user
+    as the raw key rather than a sentence.
+    """
+    strings = json.loads(STRINGS.read_text())
+    messages = strings["exceptions"]
+
+    source = (COMPONENT / "services.py").read_text()
+    raised = set(re.findall(r'translation_key="([^"]+)"', source))
+    assert raised, "no translation keys found in services.py"
+
+    assert raised <= set(messages), f"missing: {raised - set(messages)}"
+    assert set(messages) == raised, f"orphans: {set(messages) - raised}"
+
+    for key, entry in messages.items():
+        assert entry["message"].strip(), key
+
+
+def test_exception_placeholders_are_supplied() -> None:
+    """A message placeholder with no matching argument renders as a literal."""
+    strings = json.loads(STRINGS.read_text())
+    source = (COMPONENT / "services.py").read_text()
+
+    for key, entry in strings["exceptions"].items():
+        placeholders = set(re.findall(r"\{(\w+)\}", entry["message"]))
+        if not placeholders:
+            continue
+        # The raise site for this key must pass every placeholder it uses.
+        block = source.split(f'translation_key="{key}"')[1].split(")")[0]
+        for name in placeholders:
+            assert f'"{name}"' in block, f"{key} never supplies {{{name}}}"
