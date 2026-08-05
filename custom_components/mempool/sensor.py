@@ -619,19 +619,19 @@ class MempoolSensor(MempoolEntity, SensorEntity):
 
     @property
     def native_value(self) -> StateType | datetime:
-        """Return the current value by applying the description's value_fn."""
+        """Return the current value by applying the description's value_fn.
+
+        Returning None here yields `unknown`, which is deliberate. There is no
+        `available` override: the quality scale draws a distinction between not
+        being able to reach the instance at all — `unavailable`, which
+        CoordinatorEntity already reports when a poll fails — and reaching it
+        successfully but finding a particular field absent from the payload,
+        which is `unknown`. Re-adding a `native_value is not None` check to
+        `available` would collapse the second case into the first.
+        """
         return self.entity_description.value_fn(
             self.coordinator.data or {}, self._currency
         )
-
-    @property
-    def available(self) -> bool:
-        """Available only when the last poll worked and a value is present.
-
-        `super().available` covers coordinator success; the extra check hides a
-        sensor whose specific field is missing from an otherwise-good payload.
-        """
-        return super().available and self.native_value is not None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

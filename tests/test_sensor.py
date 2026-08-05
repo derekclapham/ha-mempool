@@ -19,7 +19,7 @@ from custom_components.mempool.const import (
     DOMAIN,
 )
 from custom_components.mempool.sensor import SENSORS
-from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
@@ -237,12 +237,17 @@ async def test_rolling_window_sensors(
 # --- availability -------------------------------------------------------------
 
 
-async def test_sensor_unavailable_when_field_missing(
+async def test_sensor_unknown_when_field_missing(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """A field absent from an otherwise-healthy payload hides just that sensor."""
+    """A field absent from an otherwise-healthy payload reads as unknown.
+
+    Not unavailable: the instance answered, so it is reachable. Only the one
+    value is missing. The paired test below covers the other half of that
+    distinction, where the poll itself fails.
+    """
     # A mempool summary that has `vsize` but no `count`.
     mock_endpoints(
         aioclient_mock,
@@ -251,10 +256,8 @@ async def test_sensor_unavailable_when_field_missing(
 
     await _setup(hass, mock_config_entry)
 
-    # count is gone, so mempool_transactions is unavailable...
-    assert (
-        _state(hass, mock_config_entry, "mempool_transactions") == STATE_UNAVAILABLE
-    )
+    # count is gone, so mempool_transactions has no value to report...
+    assert _state(hass, mock_config_entry, "mempool_transactions") == STATE_UNKNOWN
     # ...but vsize is still there, so its sibling is fine.
     assert _state(hass, mock_config_entry, "mempool_size") == "15.0"
 
@@ -283,13 +286,13 @@ async def test_empty_blocks_payload(
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """An empty recent-blocks list leaves the block sensors unavailable."""
+    """An empty recent-blocks list leaves the block sensors unknown."""
     mock_endpoints(aioclient_mock, overrides={API_BLOCKS: {"json": []}})
 
     await _setup(hass, mock_config_entry)
 
-    assert _state(hass, mock_config_entry, "latest_block_miner") == STATE_UNAVAILABLE
-    assert _state(hass, mock_config_entry, "blocks_per_hour") == STATE_UNAVAILABLE
+    assert _state(hass, mock_config_entry, "latest_block_miner") == STATE_UNKNOWN
+    assert _state(hass, mock_config_entry, "blocks_per_hour") == STATE_UNKNOWN
     # Height comes from its own endpoint and is unaffected.
     assert _state(hass, mock_config_entry, "block_height") == str(TIP_HEIGHT)
 
@@ -352,15 +355,15 @@ async def test_top_pool_sensors_with_no_pools(
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """An empty mining-pool list leaves both pool sensors unavailable."""
+    """An empty mining-pool list leaves both pool sensors unknown."""
     mock_endpoints(
         aioclient_mock, overrides={API_MINING_POOLS: {"json": {"pools": []}}}
     )
 
     await _setup(hass, mock_config_entry)
 
-    assert _state(hass, mock_config_entry, "top_pool") == STATE_UNAVAILABLE
-    assert _state(hass, mock_config_entry, "top_pool_share") == STATE_UNAVAILABLE
+    assert _state(hass, mock_config_entry, "top_pool") == STATE_UNKNOWN
+    assert _state(hass, mock_config_entry, "top_pool_share") == STATE_UNKNOWN
 
 
 async def test_entity_naming_conventions(
@@ -394,3 +397,35 @@ async def test_entity_naming_conventions(
         # with no matching entry leaves the entity nameless and collapses its
         # entity_id to the device name alone.
         assert entry.original_name == names[entry.translation_key]["name"]
+
+
+async def test_unavailable_and_unknown_are_distinct(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """The two states mean different things, and one sensor shows both.
+
+    `unavailable` means the instance could not be reached; `unknown` means it
+    answered but this particular field was absent. Asserting both on the same
+    sensor is what stops a future `available` override from quietly collapsing
+    the distinction, since either state alone would still look reasonable.
+    """
+    # Reachable, but the mempool summary omits `count`.
+    mock_endpoints(
+        aioclient_mock,
+        overrides={API_MEMPOOL: {"json": {"vsize": 15_000_000}}},
+    )
+    await _setup(hass, mock_config_entry)
+
+    assert _state(hass, mock_config_entry, "mempool_transactions") == STATE_UNKNOWN
+
+    # Now the poll itself fails: the same sensor becomes unavailable.
+    mock_config_entry.runtime_data.fast.async_set_update_error(
+        Exception("instance unreachable")
+    )
+    await hass.async_block_till_done()
+
+    assert (
+        _state(hass, mock_config_entry, "mempool_transactions") == STATE_UNAVAILABLE
+    )
