@@ -19,6 +19,7 @@ from custom_components.mempool.const import (
     DOMAIN,
     SERVICE_IMPORT_PRICE_HISTORY,
 )
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
@@ -288,3 +289,25 @@ async def test_uses_options_currency(
     assert mock_import.call_args[0][2][0]["start"] == dt_util.utc_from_timestamp(
         NOW_TS
     )
+
+
+async def test_entry_loaded_then_unloaded(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """An entry that was loaded and then unloaded is rejected.
+
+    Distinct from test_entry_not_loaded, which never loads at all. Home
+    Assistant clears runtime_data on unload, so both the old presence check
+    and the current ConfigEntryState.LOADED check reject this; the state
+    check is simply the one the action-setup rule prescribes.
+    """
+    await _setup(hass, mock_config_entry)
+    assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.NOT_LOADED
+
+    with pytest.raises(ServiceValidationError):
+        await _call(hass, mock_config_entry.entry_id)

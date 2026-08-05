@@ -81,7 +81,11 @@ async def test_unique_ids_are_stable(
 
 
 async def test_expected_sensor_keys() -> None:
-    """The described sensor set itself is fixed (36 sensors + the price one)."""
+    """The described sensor set is fixed.
+
+    35 described sensors, plus the price sensor when the instance has a feed,
+    for 36 entities in total.
+    """
     assert [description.key for description in SENSORS] == [
         "block_height",
         "fee_fastest",

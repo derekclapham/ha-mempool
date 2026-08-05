@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
+
 from custom_components.mempool.sensor import PRICE_SENSOR, SENSORS
 
 COMPONENT = Path(__file__).parent.parent / "custom_components" / "mempool"
@@ -41,6 +43,29 @@ def test_no_orphan_entity_translations() -> None:
     }
 
     assert set(strings["entity"]["sensor"]) == used
+
+
+def test_service_actions_are_described() -> None:
+    """Every action and every field it takes has user-facing text.
+
+    services.yaml carries only the field schema, so the action's name, its
+    description and each field's text have to come from strings.json.
+    """
+    strings = json.loads(STRINGS.read_text())
+    services = strings["services"]
+    declared = yaml.safe_load((COMPONENT / "services.yaml").read_text())
+
+    assert set(services) == set(declared)
+
+    for name, service in services.items():
+        assert service["name"]
+        assert service["description"]
+        assert set(service.get("fields", {})) == set(
+            declared[name].get("fields", {})
+        )
+        for field in service.get("fields", {}).values():
+            assert field["name"]
+            assert field["description"]
 
 
 def test_config_flow_steps_are_described() -> None:
