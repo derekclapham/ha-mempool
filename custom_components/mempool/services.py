@@ -7,11 +7,11 @@ are rich immediately instead of filling in over time.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
@@ -115,7 +115,16 @@ async def _handle_import_price_history(hass: HomeAssistant, call: ServiceCall) -
     # source="recorder" + a plain entity_id imports into that entity's own
     # long-term stats (an upsert per hour), so re-running is safe. has_mean
     # (not has_sum) because a price is an average, not a running total.
-    metadata = StatisticMetaData(
+    #
+    # `has_mean` is deprecated in newer Home Assistant in favour of `mean_type`,
+    # which arrived alongside `unit_class` and does not exist at the version
+    # declared in hacs.json. Setting either would break the declared minimum,
+    # so this keeps the older spelling: the recorder has an explicit shim for
+    # exactly this case, deriving mean_type from has_mean (True -> ARITHMETIC)
+    # and unit_class from the unit (a currency has no converter, so None). When
+    # the minimum rises past the release that drops has_mean, swap this for
+    # mean_type=StatisticMeanType.ARITHMETIC and unit_class=None.
+    metadata = StatisticMetaData(  # type: ignore[typeddict-item]
         has_mean=True,
         has_sum=False,
         name=None,
@@ -162,6 +171,11 @@ def _to_hourly_stats(
     return stats
 
 
-def _typed(entry: Any) -> MempoolConfigEntry:
-    """Narrow a ConfigEntry to the integration's typed entry (for the checker)."""
-    return entry
+def _typed(entry: ConfigEntry) -> MempoolConfigEntry:
+    """Narrow a ConfigEntry to the integration's typed entry (for the checker).
+
+    The domain and loaded-state checks above have already established that this
+    entry is ours and has its runtime_data populated, which is what the cast
+    asserts and the type system cannot see.
+    """
+    return cast("MempoolConfigEntry", entry)

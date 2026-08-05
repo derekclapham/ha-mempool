@@ -7,7 +7,12 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
@@ -61,12 +66,13 @@ async def _probe_currencies(client: MempoolClient) -> list[str]:
 
     The prices payload also carries a non-currency "time" key, so keep only
     3-letter uppercase ISO codes (USD, AUD, ...) with a positive value.
+
+    A payload that is not a JSON object raises MempoolApiError from the client
+    rather than reaching here, so it is caught alongside a dead endpoint.
     """
     try:
         prices = await client.prices()
     except MempoolApiError:
-        return []
-    if not isinstance(prices, dict):
         return []
     return sorted(
         k
@@ -318,7 +324,7 @@ class MempoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry) -> MempoolOptionsFlow:
+    def async_get_options_flow(config_entry: ConfigEntry) -> MempoolOptionsFlow:
         """Return the options flow handler."""
         return MempoolOptionsFlow()
 

@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.components.recorder.common import (
+    async_wait_recording_done,
+)
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.mempool.const import (
@@ -22,6 +25,7 @@ from custom_components.mempool.const import (
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .conftest import BASE_URL, NOW_TS, mock_endpoints
@@ -317,3 +321,47 @@ async def test_entry_loaded_then_unloaded(
 
     with pytest.raises(ServiceValidationError):
         await _call(hass, mock_config_entry.entry_id)
+
+
+async def test_import_reaches_the_real_recorder(
+    recorder_mock: Any,
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Drive the import through the real recorder, not a patched function.
+
+    Every other test here patches async_import_statistics, which would hide a
+    metadata dict the recorder rejects. That matters because `has_mean` is
+    deprecated in favour of `mean_type`: this integration still sends the older
+    spelling so it keeps working at its declared minimum Home Assistant
+    version, and this test is what proves the recorder's compatibility shim
+    still accepts it on the version actually installed.
+    """
+    from homeassistant.components.recorder.statistics import statistics_during_period
+    from homeassistant.components.recorder.util import get_instance
+
+    await _setup(hass, mock_config_entry)
+
+    registry = er.async_get(hass)
+    statistic_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{mock_config_entry.entry_id}_price_usd"
+    )
+    assert statistic_id is not None
+
+    await _call(hass, mock_config_entry.entry_id)
+    await async_wait_recording_done(hass)
+
+    stats = await get_instance(hass).async_add_executor_job(
+        statistics_during_period,
+        hass,
+        dt_util.utc_from_timestamp(NOW_TS - 86400),
+        None,
+        {statistic_id},
+        "hour",
+        None,
+        {"mean", "min", "max"},
+    )
+
+    rows = stats[statistic_id]
+    assert [row["mean"] for row in rows] == [94000, 94500, 95000]

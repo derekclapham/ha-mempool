@@ -10,7 +10,13 @@ import pytest
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.mempool.api import MempoolApiError, MempoolClient
-from custom_components.mempool.const import API_DIFFICULTY, API_TIP_HEIGHT
+from custom_components.mempool.const import (
+    API_BLOCKS,
+    API_DIFFICULTY,
+    API_HISTORICAL_PRICE,
+    API_MEMPOOL,
+    API_TIP_HEIGHT,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -201,3 +207,70 @@ async def test_non_utf8_body(
 
     with pytest.raises(MempoolApiError, match="Non-UTF-8"):
         await _client(hass).difficulty_adjustment()
+
+
+# --- response shape validation ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("path", "body"),
+    [
+        (API_MEMPOOL, "[1, 2, 3]"),
+        (API_MEMPOOL, "42"),
+        (API_MEMPOOL, "null"),
+    ],
+)
+async def test_endpoint_expecting_an_object_rejects_other_shapes(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    path: str,
+    body: str,
+) -> None:
+    """A wrong-shaped payload is a clean error, not an AttributeError later.
+
+    Without this the value would flow into a sensor's value_fn and blow up
+    there, well away from the endpoint that actually misbehaved.
+    """
+    aioclient_mock.get(f"{BASE_URL}{path}", text=body)
+
+    with pytest.raises(MempoolApiError, match="Expected a JSON object"):
+        await _client(hass).mempool()
+
+
+@pytest.mark.parametrize("body", ['{"not": "an array"}', "7"])
+async def test_endpoint_expecting_an_array_rejects_other_shapes(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, body: str
+) -> None:
+    """The blocks endpoints must answer with a JSON array."""
+    aioclient_mock.get(f"{BASE_URL}{API_BLOCKS}", text=body)
+
+    with pytest.raises(MempoolApiError, match="Expected a JSON array"):
+        await _client(hass).blocks()
+
+
+async def test_historical_price_accepts_both_shapes(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Object and bare-array payloads are both accepted."""
+    aioclient_mock.get(
+        f"{BASE_URL}{API_HISTORICAL_PRICE}", json={"prices": [{"time": 1, "USD": 2}]}
+    )
+    assert await _client(hass).historical_price("USD") == {
+        "prices": [{"time": 1, "USD": 2}]
+    }
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{BASE_URL}{API_HISTORICAL_PRICE}", json=[{"time": 1, "USD": 2}]
+    )
+    assert await _client(hass).historical_price("USD") == [{"time": 1, "USD": 2}]
+
+
+async def test_historical_price_rejects_a_scalar(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Anything that is neither object nor array is still an error."""
+    aioclient_mock.get(f"{BASE_URL}{API_HISTORICAL_PRICE}", text="123")
+
+    with pytest.raises(MempoolApiError, match="Expected a JSON object or array"):
+        await _client(hass).historical_price("USD")

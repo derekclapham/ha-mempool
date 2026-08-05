@@ -31,12 +31,17 @@ jobs:
           python -m pip install --upgrade pip
           # pytest-homeassistant-custom-component pins the Home Assistant it
           # tests against, so it is the single source of the HA version here.
-          pip install pytest-homeassistant-custom-component pytest-cov ruff
+          pip install pytest-homeassistant-custom-component pytest-cov ruff mypy
 
       - name: Lint
         # Home Assistant's own conventions, not ruff's defaults; the two
         # disagree on import ordering.
         run: ruff check --config ruff.toml custom_components tests conftest.py
+
+      - name: Type check
+        # Strict typing, matching what core applies to integrations in its
+        # .strict-typing list. Settings live in mypy.ini.
+        run: mypy
 
       - name: Test
         run: |

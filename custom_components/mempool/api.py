@@ -90,6 +90,32 @@ class MempoolClient:
             # e.g. an HTML error page from a reverse proxy in front of the node.
             raise MempoolApiError(f"Invalid JSON from {path}: {text[:80]!r}") from err
 
+    async def _get_dict(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """GET a path that must answer with a JSON object.
+
+        Checking the shape here rather than trusting it means a proxy or a
+        misbehaving instance returning, say, a list surfaces as MempoolApiError
+        — which the coordinators already turn into a clean UpdateFailed —
+        instead of an AttributeError deep inside a sensor's value_fn.
+        """
+        data = await self._get(path, params)
+        if not isinstance(data, dict):
+            raise MempoolApiError(
+                f"Expected a JSON object from {path}, got {type(data).__name__}"
+            )
+        return data
+
+    async def _get_list(self, path: str) -> list[dict[str, Any]]:
+        """GET a path that must answer with a JSON array."""
+        data = await self._get(path)
+        if not isinstance(data, list):
+            raise MempoolApiError(
+                f"Expected a JSON array from {path}, got {type(data).__name__}"
+            )
+        return data
+
     @staticmethod
     async def _read_capped(resp: aiohttp.ClientResponse, path: str) -> str:
         """Read a response body, refusing to buffer more than the cap.
@@ -118,40 +144,54 @@ class MempoolClient:
 
     async def difficulty_adjustment(self) -> dict[str, Any]:
         """Difficulty adjustment progress / ETA / projected change."""
-        return await self._get(API_DIFFICULTY)
+        return await self._get_dict(API_DIFFICULTY)
 
     async def fees_recommended(self) -> dict[str, Any]:
         """Recommended fee tiers in sat/vB."""
-        return await self._get(API_FEES)
+        return await self._get_dict(API_FEES)
 
     async def mempool(self) -> dict[str, Any]:
         """Mempool summary (tx count, vsize, total fee)."""
-        return await self._get(API_MEMPOOL)
+        return await self._get_dict(API_MEMPOOL)
 
     async def hashrate(self) -> dict[str, Any]:
         """Mining hashrate + current difficulty."""
-        return await self._get(API_HASHRATE)
+        return await self._get_dict(API_HASHRATE)
 
     async def prices(self) -> dict[str, Any]:
         """Current spot price across the fiats the instance publishes."""
-        return await self._get(API_PRICES)
+        return await self._get_dict(API_PRICES)
 
-    async def historical_price(self, currency: str) -> dict[str, Any]:
-        """Historical spot price for a currency (if the price feed is on)."""
-        return await self._get(API_HISTORICAL_PRICE, {"currency": currency})
+    async def historical_price(
+        self, currency: str
+    ) -> dict[str, Any] | list[dict[str, Any]]:
+        """Historical spot price for a currency (if the price feed is on).
+
+        Current instances answer with {"prices": [...]}, but the caller has
+        always tolerated a bare array as well and that tolerance is kept rather
+        than narrowed: it costs nothing, and it is not worth breaking an
+        instance running an older build to tidy up a return type.
+        """
+        data = await self._get(API_HISTORICAL_PRICE, {"currency": currency})
+        if isinstance(data, dict | list):
+            return data
+        raise MempoolApiError(
+            f"Expected a JSON object or array from {API_HISTORICAL_PRICE}, "
+            f"got {type(data).__name__}"
+        )
 
     async def blocks(self) -> list[dict[str, Any]]:
         """Recent blocks, newest first (index 0 is the chain tip)."""
-        return await self._get(API_BLOCKS)
+        return await self._get_list(API_BLOCKS)
 
     async def mempool_blocks(self) -> list[dict[str, Any]]:
         """Projected upcoming blocks from the current mempool."""
-        return await self._get(API_MEMPOOL_BLOCKS)
+        return await self._get_list(API_MEMPOOL_BLOCKS)
 
     async def mining_pools(self) -> dict[str, Any]:
         """Mining pool distribution over the last week."""
-        return await self._get(API_MINING_POOLS)
+        return await self._get_dict(API_MINING_POOLS)
 
     async def reward_stats(self) -> dict[str, Any]:
         """Reward/fee totals over the last 144 blocks (~24h)."""
-        return await self._get(API_REWARD_STATS)
+        return await self._get_dict(API_REWARD_STATS)
