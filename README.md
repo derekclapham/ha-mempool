@@ -18,7 +18,7 @@ Unlike Home Assistant's core `bitcoin`/`blockchain` integrations (which rely on 
 
 ## Requirements
 
-- Home Assistant **2025.1** or newer.
+- Home Assistant **2025.3** or newer (the sensor platform uses `AddConfigEntryEntitiesCallback`, which does not exist before 2025.3).
 - Either the public **mempool.space**, or a reachable [mempool](https://github.com/mempool/mempool) instance of your own. A self-hosted URL must be reachable **from the Home Assistant host** (mind VLANs/firewalls if it's on another subnet).
 - The **BTC price** sensor needs the instance's optional **price feed** enabled (mempool.space has it). On-chain, fee, mempool and mining sensors work regardless; without a price feed the integration simply sets up without the price sensor.
 
